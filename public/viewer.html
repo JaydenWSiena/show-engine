@@ -509,12 +509,12 @@
 
                 // If masterGain exists and is currently at 0 (started by unlock), ensure fade is applied
                 if (this.masterGain) {
-                    // If the gain is 0 (we set it on unlock), ramp to 1 over 800ms
+                    // If the gain is 0 (we set it on unlock), ramp to 1 over 2000ms
                     try {
                         const now = this.audioCtx.currentTime;
                         const current = this.masterGain.gain.value;
                         if (current === 0) {
-                            this.fadeInMaster(0.8);
+                            this.fadeInMaster(2.0);
                         }
                     } catch (e) { }
                 }
@@ -549,7 +549,7 @@
             }
 
             // Fade master gain from 0 -> 1 over duration (seconds)
-            fadeInMaster(duration = 0.8) {
+            fadeInMaster(duration = 2.0) {
                 if (!this.audioCtx || !this.masterGain) return;
                 const now = this.audioCtx.currentTime;
                 try {
@@ -596,8 +596,8 @@
                     stemEngine.masterGain.gain.cancelScheduledValues(now);
                     stemEngine.masterGain.gain.setValueAtTime(0.0, now);
                 } catch (e) { }
-                // Fade up over 800ms
-                stemEngine.fadeInMaster(0.8);
+                // Fade up over 2000ms
+                stemEngine.fadeInMaster(2.0);
             }
 
             audioUnlocked = true;
@@ -746,7 +746,7 @@
             const isBoosted = boostMemory[trackId];
 
             const btn = document.getElementById(`btn-boost-${trackId}`);
-            const strip = document.getElementById(`strip-${track.id}`);
+            const strip = document.getElementById(`strip-${trackId}`);
 
             if (btn) btn.classList.toggle('active', isBoosted);
             if (strip) strip.classList.toggle('boosted', isBoosted);
