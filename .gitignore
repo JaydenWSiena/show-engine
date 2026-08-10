@@ -1,3 +1,6 @@
+public/uploads/
+database.json
+
 # Logs
 logs
 *.log
