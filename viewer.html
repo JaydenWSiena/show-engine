@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Show Viewer</title>
+    <style>
+        :root {
+            --bg: #07070d;
+            --card: #111118;
+            --panel: #181824;
+            --border: #28283a;
+            --accent-blue: #2563eb;
+            --accent-purple: #7c3aed;
+            --boost-orange: #f97316;
+            --text: #f4f4f5;
+            --muted: #94a3b8;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #visualizer-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        #unlock-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(7, 7, 13, 0.96);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .btn-unlock {
+            background: linear-gradient(135deg, #1e3a8a, #581c87);
+            color: white;
+            border: 1px solid rgba(124, 58, 237, 0.5);
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 25px rgba(30, 58, 138, 0.6);
+        }
+
+        .btn-unlock:active {
+            transform: scale(0.95);
+        }
+
+        /* --- HEADER --- */
+        .header {
+            position: relative;
+            z-index: 2;
+            margin-top: 20px;
+            text-align: center;
+            background: rgba(15, 15, 26, 0.85);
+            backdrop-filter: blur(14px);
+            border-radius: 20px;
+            padding: 12px 28px;
+            border: 1px solid rgba(124, 58, 237, 0.25);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(30, 58, 138, 0.3);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #60a5fa;
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            margin-bottom: 6px;
+        }
+
+        .cue-header-main {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- CENTER ORBITING STAGE --- */
+        #stage-container {
+            position: absolute;
+            top: 42%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .orbit-avatar-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 48px;
+            height: 48px;
+            margin-top: -24px;
+            margin-left: -24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease-out;
+            pointer-events: auto;
+        }
+
+        .avatar-circle {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+            background: var(--panel);
+            position: relative;
+            z-index: 2;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, border-color 0.1s ease-out;
+        }
+
+        .avatar-fallback {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: var(--panel);
+            border: 2px solid var(--border);
+            z-index: 1;
+        }
+
+        .pulse-ring {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid var(--accent-blue);
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0;
+            transform: scale(1);
+            transition: transform 0.08s ease-out, opacity 0.08s ease-out;
+        }
+
+        .avatar-label {
+            position: absolute;
+            bottom: -38px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #f1f5f9;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+            white-space: nowrap;
+            background: rgba(7, 7, 13, 0.9);
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(124, 58, 237, 0.35);
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        /* --- BOTTOM CONSOLE (WITH BOOST OPTION) --- */
+        #bottom-console {
+            position: relative;
+            z-index: 10;
+            margin-bottom: 24px;
+            background: rgba(17, 17, 24, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            border-radius: 20px;
+            padding: 20px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+            max-width: 92vw;
+            overflow-y: auto;
+            flex-wrap: wrap;
+        }
+
+        .fader-strip {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 290px;
+            background: rgba(24, 24, 36, 0.6);
+            padding: 14px 18px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .fader-strip.boosted {
+            border-color: rgba(249, 115, 22, 0.4);
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.15);
+        }
+
+        .fader-strip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .fader-strip-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            max-width: 160px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Boost Toggle Button */
+        .btn-boost {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-boost:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-boost.active {
+            background: rgba(249, 115, 22, 0.2);
+            border-color: var(--boost-orange);
+            color: #ffedd5;
+            box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+        }
+
+        /* Wider VU Level Bar */
+        .vu-meter {
+            width: 100%;
+            height: 12px;
+            background: #101016;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .vu-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #1e3a8a 0%, #2563eb 50%, #6b21a8 85%, #9333ea 100%);
+            transition: width 0.05s ease-out;
+        }
+
+        .fader-strip.boosted .vu-fill {
+            background: linear-gradient(to right, #1e3a8a 0%, #2563eb 40%, #f97316 80%, #ef4444 100%);
+        }
+
+        /* 16th Notch Steps Slider */
+        .slider-notch-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type=range].horizontal-fader {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 14px;
+            background: transparent;
+            margin: 0;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        input[type=range].horizontal-fader::-webkit-slider-runnable-track {
+            height: 12px;
+            border-radius: 6px;
+            background: repeating-linear-gradient(to right,
+                    rgba(255, 255, 255, 0.4) 0,
+                    rgba(255, 255, 255, 0.4) 2px,
+                    #1e1e2d 2px,
+                    #1e1e2d 6.25%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input[type=range].horizontal-fader::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 22px;
+            width: 14px;
+            border-radius: 4px;
+            background: #3b82f6;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+            margin-top: -5px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .fader-strip.boosted input[type=range].horizontal-fader::-webkit-slider-thumb {
+            background: var(--boost-orange);
+            border-color: #ffedd5;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+            padding: 10px 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="visualizer-canvas"></canvas>
+
+    <div id="unlock-overlay">
+        <h2 style="margin-bottom: 20px;">Ready for the show?</h2>
+        <button class="btn-unlock" onclick="unlockAudio()">Join Audio Stream</button>
+    </div>
+
+    <div class="header">
+        <div id="show-title"
+            style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;">
+            Loading Show...</div>
+        <div id="show-status" class="status-badge">Waiting for show to start...</div>
+        <div class="cue-header-main">
+            <h2 id="cue-title">Standby</h2>
+        </div>
+    </div>
+
+    <div id="stage-container"></div>
+
+    <div id="bottom-console">
+        <div class="empty-state">No active tracks</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let audioUnlocked = false;
+        let pendingCueState = null;
+        let currentTracksCache = [];
+        let volumeMemory = {};
+        let boostMemory = {}; // Memory state for volume boost (+6dB)
+
+        const canvas = document.getElementById('visualizer-canvas');
+        const canvasCtx = canvas.getContext('2d');
+
+        let neurons = []; pulses = []; globalOrbitAngle = 0;
+        const urlParams = new URLSearchParams(window.location.search);
+        const showId = urlParams.get('show') || 'main-show';
+
+        // ========================================================
+        // SAMPLE-ACCURATE BULLETPROOF STEM AUDIO ENGINE
+        // ========================================================
+        class BulletproofStemEngine {
+            constructor() {
+                this.audioCtx = null;
+                this.masterAnalyser = null;
+                this.stemBuffers = new Map(); // src -> AudioBuffer
+                this.activeInstances = [];   // [{ id, source, gainNode, analyser, levelEl }]
+                this.startTime = 0;
+                this.seekOffset = 0;
+                this.isPlaying = false;
+            }
+
+            initContext() {
+                if (!this.audioCtx) {
+                    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                        latencyHint: 'interactive'
+                    });
+                    this.masterAnalyser = this.audioCtx.createAnalyser();
+                    this.masterAnalyser.fftSize = 256;
+                    this.masterAnalyser.connect(this.audioCtx.destination);
+                }
+                if (this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+            }
+
+            async preloadBuffer(src) {
+                if (!src) return null;
+                if (this.stemBuffers.has(src)) return this.stemBuffers.get(src);
+
+                try {
+                    const res = await fetch(src);
+                    const arrayBuffer = await res.arrayBuffer();
+                    const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+                    this.stemBuffers.set(src, audioBuffer);
+                    return audioBuffer;
+                } catch (err) {
+                    console.error(`❌ Failed to decode audio stem (${src}):`, err);
+                    return null;
+                }
+            }
+
+            async playTracks(tracks, startOffset = 0) {
+                this.initContext();
+                this.stopAll();
+
+                this.seekOffset = startOffset;
+                this.isPlaying = true;
+
+                // Pre-decode all stem buffers into memory concurrently
+                const loadPromises = tracks.map(track => this.preloadBuffer(track.src));
+                await Promise.all(loadPromises);
+
+                if (!this.isPlaying) return; // Stopped while downloading
+
+                // Schedule ALL audio sources to trigger on the EXACT same sample tick (+100ms offset)
+                const scheduledStartTime = this.audioCtx.currentTime + 0.100;
+                this.startTime = scheduledStartTime - startOffset;
+
+                tracks.forEach((track) => {
+                    const buffer = this.stemBuffers.get(track.src);
+                    if (!buffer) return;
+
+                    const source = this.audioCtx.createBufferSource();
+                    source.buffer = buffer;
+
+                    const gainNode = this.audioCtx.createGain();
+                    const trackAnalyser = this.audioCtx.createAnalyser();
+                    trackAnalyser.fftSize = 64;
+
+                    const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
+                    const isBoosted = !!boostMemory[track.id];
+                    const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
+
+                    gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
+
+                    // Chain: Source -> GainNode -> Track Analyser -> Master Analyser
+                    source.connect(gainNode);
+                    gainNode.connect(trackAnalyser);
+                    trackAnalyser.connect(this.masterAnalyser);
+
+                    // Start hardware-level scheduled playback
+                    source.start(scheduledStartTime, startOffset);
+
+                    this.activeInstances.push({
+                        id: track.id,
+                        src: track.src,
+                        source: source,
+                        gainNode: gainNode,
+                        analyser: trackAnalyser,
+                        levelEl: document.getElementById(`level-${track.id}`)
+                    });
+                });
+            }
+
+            updateVolume(trackId, volFloat, isBoosted) {
+                const instance = this.activeInstances.find(i => i.id === trackId);
+                if (instance && this.audioCtx) {
+                    const targetGain = volFloat * (isBoosted ? 2.0 : 1.0);
+                    // Smooth 10ms gain transition to prevent clicks/pops
+                    instance.gainNode.gain.setTargetAtTime(targetGain, this.audioCtx.currentTime, 0.01);
+                }
+            }
+
+            seek(targetTime, currentTracks) {
+                if (currentTracks && currentTracks.length > 0) {
+                    this.playTracks(currentTracks, targetTime);
+                }
+            }
+
+            stopAll() {
+                this.isPlaying = false;
+                this.activeInstances.forEach(instance => {
+                    try {
+                        instance.source.stop();
+                        instance.source.disconnect();
+                    } catch (e) { }
+                    try { if (instance.gainNode) instance.gainNode.disconnect(); } catch (e) { }
+                    try { if (instance.analyser) instance.analyser.disconnect(); } catch (e) { }
+                });
+                this.activeInstances = [];
+            }
+        }
+
+        const stemEngine = new BulletproofStemEngine();
+
+        // Canvas visualizer particle initialization
+        function initNeurons() {
+            neurons = []; pulses = [];
+            const numNeurons = Math.floor((canvas.width * canvas.height) / 18000);
+            for (let i = 0; i < numNeurons; i++) {
+                neurons.push({
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.08, vy: (Math.random() - 0.5) * 0.08,
+                    baseRadius: Math.random() * 2 + 1.5, charge: 0, cooldown: 0,
+                    colorShift: Math.random() > 0.5 ? '#1d4ed8' : '#6b21a8'
+                });
+            }
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initNeurons();
+        }
+
+        function unlockAudio() {
+            stemEngine.initContext();
+            audioUnlocked = true;
+            document.getElementById('unlock-overlay').style.display = 'none';
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            drawAbstractVisualizer();
+
+            if (pendingCueState) {
+                const state = pendingCueState; pendingCueState = null;
+                if (state && state.activeCue && state.activeCue.tracks && state.activeCue.tracks.length > 0) {
+                    playCue(state.activeCue, state.currentSeekTime);
+                }
+            } else {
+                socket.emit('join-show', { showId: showId });
+                socket.emit('request-current-state', { showId: showId });
+            }
+        }
+
+        // --- SOCKET HANDLERS ---
+        socket.emit('join-show', { showId: showId });
+
+        socket.on('database-updated', (db) => {
+            updateShowTitle(db);
+        });
+
+        async function fetchShowInfo() {
+            try {
+                const res = await fetch('/api/database');
+                const db = await res.json();
+                updateShowTitle(db);
+            } catch (err) {
+                console.error("Failed to load show info:", err);
+            }
+        }
+
+        function updateShowTitle(db) {
+            if (!db || !db.shows) return;
+            const currentShow = db.shows.find(s => s.id === showId);
+            const titleEl = document.getElementById('show-title');
+            if (titleEl && currentShow) {
+                titleEl.innerText = currentShow.title;
+            }
+        }
+
+        fetchShowInfo();
+
+        socket.on('cue-triggered', (state) => {
+            if (!audioUnlocked) { pendingCueState = state; return; }
+            pendingCueState = null;
+            if (!state || !state.activeCue || !state.activeCue.tracks || state.activeCue.tracks.length === 0) {
+                handleShowStopped();
+            } else {
+                playCue(state.activeCue, state.currentSeekTime);
+            }
+        });
+
+        socket.on('cue-seeked', (data) => {
+            if (data && typeof data.position === 'number') {
+                stemEngine.seek(data.position, currentTracksCache);
+            }
+        });
+
+        socket.on('cue-stopped', handleShowStopped);
+        socket.on('show-stopped', handleShowStopped);
+
+        function handleShowStopped() {
+            stemEngine.stopAll();
+            currentTracksCache = [];
+            document.getElementById('show-status').innerText = "Show Stopped";
+            document.getElementById('show-status').style.color = "#94a3b8";
+            document.getElementById('cue-title').innerText = "Standby";
+
+            const stageContainer = document.getElementById('stage-container');
+            const bottomConsole = document.getElementById('bottom-console');
+            if (stageContainer) stageContainer.innerHTML = '';
+            if (bottomConsole) bottomConsole.innerHTML = '<div class="empty-state">No active tracks</div>';
+        }
+
+        function playCue(activeCue, currentSeekTime) {
+            document.getElementById('show-status').innerText = "▶ Live Now";
+            document.getElementById('show-status').style.color = "#60a5fa";
+            document.getElementById('cue-title').innerText = activeCue.name;
+
+            const stageContainer = document.getElementById('stage-container');
+            const bottomConsole = document.getElementById('bottom-console');
+            stageContainer.innerHTML = ''; bottomConsole.innerHTML = '';
+
+            currentTracksCache = activeCue.tracks || [];
+
+            currentTracksCache.forEach((track) => {
+                if (volumeMemory[track.id] === undefined) volumeMemory[track.id] = 1.0;
+                if (boostMemory[track.id] === undefined) boostMemory[track.id] = false;
+
+                const currentVolume = volumeMemory[track.id];
+                const isBoosted = boostMemory[track.id];
+
+                // Orbit Avatar DOM Element
+                const avatarWrapper = document.createElement('div');
+                avatarWrapper.className = 'orbit-avatar-wrapper';
+                avatarWrapper.id = `orbit-wrapper-${track.id}`;
+                avatarWrapper.innerHTML = `
+                  <div class="pulse-ring" id="ring-${track.id}"></div>
+                  <div class="avatar-fallback" id="fallback-${track.id}">🎤</div>
+                  ${track.avatar ? `<img src="${track.avatar}" class="avatar-circle" id="avatar-${track.id}" onerror="this.style.display='none';">` : ''}
+                  <div class="avatar-label">${track.name}</div>
+                `;
+                stageContainer.appendChild(avatarWrapper);
+
+                // Fader Strip with Boost Button DOM Element
+                const faderStrip = document.createElement('div');
+                faderStrip.className = `fader-strip ${isBoosted ? 'boosted' : ''}`;
+                faderStrip.id = `strip-${track.id}`;
+                faderStrip.innerHTML = `
+                  <div class="fader-strip-header">
+                    <span class="fader-strip-name" title="${track.name}">${track.name}</span>
+                    <button class="btn-boost ${isBoosted ? 'active' : ''}" id="btn-boost-${track.id}" 
+                            onclick="toggleBoost('${track.id}')" title="Boost Volume +6dB">⚡ Boost</button>
+                  </div>
+                  <div class="vu-meter">
+                    <div class="vu-fill" id="level-${track.id}"></div>
+                  </div>
+                  <div class="slider-notch-wrapper">
+                    <input type="range" class="horizontal-fader" min="0" max="1" step="0.0625" value="${currentVolume}" 
+                           oninput="handleVolumeChange('${track.id}', this.value)">
+                  </div>
+                `;
+                bottomConsole.appendChild(faderStrip);
+            });
+
+            // Start synchronized stem engine playback
+            stemEngine.playTracks(currentTracksCache, currentSeekTime || 0);
+        }
+
+        // --- VOLUME & BOOST HANDLERS ---
+        window.handleVolumeChange = function (trackId, newVolume) {
+            const volFloat = parseFloat(newVolume);
+            volumeMemory[trackId] = volFloat;
+            const isBoosted = !!boostMemory[trackId];
+            stemEngine.updateVolume(trackId, volFloat, isBoosted);
+        }
+
+        window.toggleBoost = function (trackId) {
+            boostMemory[trackId] = !boostMemory[trackId];
+            const isBoosted = boostMemory[trackId];
+
+            const btn = document.getElementById(`btn-boost-${trackId}`);
+            const strip = document.getElementById(`strip-${trackId}`);
+
+            if (btn) btn.classList.toggle('active', isBoosted);
+            if (strip) strip.classList.toggle('boosted', isBoosted);
+
+            const currentVol = volumeMemory[trackId] !== undefined ? volumeMemory[trackId] : 1.0;
+            stemEngine.updateVolume(trackId, currentVol, isBoosted);
+        }
+
+        // --- VISUALIZER DRAW LOOP ---
+        function drawAbstractVisualizer() {
+            requestAnimationFrame(drawAbstractVisualizer);
+            if (!stemEngine.masterAnalyser) return;
+
+            const freqData = new Uint8Array(stemEngine.masterAnalyser.frequencyBinCount);
+            stemEngine.masterAnalyser.getByteFrequencyData(freqData);
+
+            canvasCtx.fillStyle = 'rgba(7, 7, 13, 0.22)';
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let bassSum = 0, midSum = 0, highSum = 0;
+            for (let i = 0; i < 8; i++) bassSum += freqData[i];
+            for (let i = 8; i < 40; i++) midSum += freqData[i];
+            for (let i = 40; i < 128; i++) highSum += freqData[i];
+
+            const bassEnergy = (bassSum / 8) / 255;
+            const midEnergy = (midSum / 32) / 255;
+            const highEnergy = (highSum / 88) / 255;
+
+            const maxConnectDist = 120 + bassEnergy * 25;
+            const isAudioPeak = bassEnergy > 0.62 || midEnergy > 0.65;
+
+            neurons.forEach((n, idx) => {
+                n.x += n.vx * (1 + bassEnergy * 0.4);
+                n.y += n.vy * (1 + bassEnergy * 0.4);
+
+                if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+                if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+
+                n.charge = Math.max(0, n.charge - 0.01);
+                if (n.cooldown > 0) n.cooldown--;
+
+                if (isAudioPeak && n.cooldown === 0 && Math.random() < 0.006) {
+                    n.charge = 1.0; n.cooldown = 200;
+                    if (pulses.length < 6) {
+                        const targetIdx = (idx + 1) % neurons.length;
+                        pulses.push({
+                            fromX: n.x, fromY: n.y, toX: neurons[targetIdx].x, toY: neurons[targetIdx].y,
+                            progress: 0, speed: 0.004 + Math.random() * 0.004
+                        });
+                    }
+                }
+
+                const radius = n.baseRadius + (n.charge * 2.5) + (bassEnergy * 1.2);
+                canvasCtx.beginPath();
+                canvasCtx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+                const glowColor = n.charge > 0.4 ? '#9333ea' : n.colorShift;
+                canvasCtx.shadowBlur = 4 + (n.charge * 12);
+                canvasCtx.shadowColor = glowColor;
+                canvasCtx.fillStyle = n.charge > 0.6 ? '#c084fc' : glowColor;
+                canvasCtx.fill();
+                canvasCtx.shadowBlur = 0;
+            });
+
+            for (let i = 0; i < neurons.length; i++) {
+                for (let j = i + 1; j < neurons.length; j++) {
+                    const dx = neurons[i].x - neurons[j].x;
+                    const dy = neurons[i].y - neurons[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < maxConnectDist) {
+                        const alpha = (1 - dist / maxConnectDist) * (0.12 + midEnergy * 0.25);
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(neurons[i].x, neurons[i].y);
+                        canvasCtx.lineTo(neurons[j].x, neurons[j].y);
+                        const isFiring = (neurons[i].charge + neurons[j].charge) > 0.4;
+                        canvasCtx.strokeStyle = isFiring ? `rgba(147, 51, 234, ${alpha * 1.5})` : `rgba(37, 99, 235, ${alpha})`;
+                        canvasCtx.lineWidth = isFiring ? 1.4 : 0.7;
+                        canvasCtx.stroke();
+                    }
+                }
+            }
+
+            for (let p = pulses.length - 1; p >= 0; p--) {
+                const pulse = pulses[p];
+                pulse.progress += pulse.speed;
+                const currX = pulse.fromX + (pulse.toX - pulse.fromX) * pulse.progress;
+                const currY = pulse.fromY + (pulse.toY - pulse.fromY) * pulse.progress;
+
+                canvasCtx.beginPath();
+                canvasCtx.arc(currX, currY, 2 + highEnergy * 2, 0, Math.PI * 2);
+                canvasCtx.shadowBlur = 10; canvasCtx.shadowColor = '#9333ea';
+                canvasCtx.fillStyle = '#e9d5ff'; canvasCtx.fill();
+                canvasCtx.shadowBlur = 0;
+
+                if (pulse.progress >= 1) pulses.splice(p, 1);
+            }
+
+            globalOrbitAngle += 0.0008 + (bassEnergy * 0.0008);
+            const activeAudioInstances = stemEngine.activeInstances;
+            const totalTracks = activeAudioInstances.length;
+            const orbitRadius = Math.min(150, window.innerWidth * 0.22);
+
+            activeAudioInstances.forEach((instance, index) => {
+                const angle = globalOrbitAngle + (index * (2 * Math.PI / Math.max(1, totalTracks)));
+                const x = Math.cos(angle) * orbitRadius;
+                const y = Math.sin(angle) * orbitRadius;
+
+                const orbitWrapper = document.getElementById(`orbit-wrapper-${instance.id}`);
+                if (orbitWrapper) orbitWrapper.style.transform = `translate(${x}px, ${y}px)`;
+
+                if (instance.analyser) {
+                    const trackData = new Uint8Array(instance.analyser.frequencyBinCount);
+                    instance.analyser.getByteFrequencyData(trackData);
+
+                    let sum = 0;
+                    for (let i = 0; i < trackData.length; i++) { sum += trackData[i]; }
+                    let average = sum / trackData.length;
+                    const level = Math.min(1.0, average / 90.0);
+
+                    const levelEl = document.getElementById(`level-${instance.id}`);
+                    if (levelEl) levelEl.style.width = (level * 100) + "%";
+
+                    const avatarEl = document.getElementById(`avatar-${instance.id}`) || document.getElementById(`fallback-${instance.id}`);
+                    const ringEl = document.getElementById(`ring-${instance.id}`);
+
+                    if (avatarEl) {
+                        const scale = 1 + (level * 0.08);
+                        avatarEl.style.transform = `scale(${scale})`;
+                        const glowColor = level > 0.5 ? 'rgba(124, 58, 237, ' : 'rgba(37, 99, 235, ';
+                        avatarEl.style.boxShadow = `0 0 ${level * 18}px ${glowColor}${Math.min(1, level * 1.2)})`;
+                        avatarEl.style.borderColor = level > 0.08 ? (level > 0.5 ? '#7c3aed' : '#2563eb') : 'var(--border)';
+                    }
+
+                    if (ringEl) {
+                        ringEl.style.transform = `scale(${1 + (level * 1.2)})`;
+                        ringEl.style.opacity = level > 0.05 ? Math.max(0.2, 1 - (level * 0.4)) : 0;
+                        ringEl.style.borderColor = level > 0.5 ? '#7c3aed' : '#2563eb';
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

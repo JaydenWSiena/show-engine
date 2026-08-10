@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Show Engine Directory</title>
+  <style>
+    :root {
+      --bg: #07070d; --card: #111118; --panel: #181824; --border: #28283a;
+      --accent-blue: #2563eb; --accent-purple: #7c3aed; --go: #16a34a;
+      --text: #f4f4f5; --muted: #94a3b8;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      margin: 0; padding: 0; min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-start;
+      overflow-x: hidden;
+    }
+
+    #visualizer-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh; z-index: 0; opacity: 0.7; pointer-events: none;
+    }
+
+    /* --- TOP RIGHT ADMIN BUTTON --- */
+    .admin-btn-top {
+      position: fixed; top: 20px; right: 20px; z-index: 10;
+      width: 46px; height: 46px; border-radius: 14px;
+      background: rgba(24, 24, 36, 0.85); backdrop-filter: blur(12px);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      color: var(--text); font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s ease;
+    }
+    .admin-btn-top:hover {
+      background: rgba(124, 58, 237, 0.3);
+      border-color: rgba(124, 58, 237, 0.6);
+      transform: scale(1.08);
+    }
+
+    .container {
+      position: relative; z-index: 2; width: 100%; max-width: 900px;
+      padding: 40px 20px; box-sizing: border-box;
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    /* --- HEADER --- */
+    .header {
+      text-align: center; background: rgba(15, 15, 26, 0.85);
+      backdrop-filter: blur(14px); border-radius: 20px; padding: 20px 36px;
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin-bottom: 30px; width: 100%;
+    }
+    .status-badge {
+      display: inline-block; padding: 4px 12px;
+      background: rgba(30, 58, 138, 0.3); border-radius: 12px;
+      font-size: 12px; font-weight: 600; color: #60a5fa;
+      border: 1px solid rgba(37, 99, 235, 0.3); margin-bottom: 8px;
+    }
+    h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+
+    /* --- SHOW CARDS GRID --- */
+    .shows-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px; width: 100%;
+    }
+
+    .show-card {
+      background: rgba(17, 17, 24, 0.88); backdrop-filter: blur(16px);
+      border: 1px solid rgba(124, 58, 237, 0.2); border-radius: 20px;
+      padding: 24px; display: flex; flex-direction: column; justify-content: space-between;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .show-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(124, 58, 237, 0.5);
+    }
+
+    .show-title {
+      font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text);
+    }
+    .show-active-status {
+      font-size: 13px; color: #60a5fa; font-weight: 600;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .status-dot {
+      width: 8px; height: 8px; background-color: #22c55e;
+      border-radius: 50%; box-shadow: 0 0 8px #22c55e;
+    }
+
+    .btn-group { display: flex; width: 100%; }
+
+    .btn {
+      width: 100%; text-align: center; text-decoration: none;
+      padding: 12px 14px; font-size: 13px; font-weight: 700;
+      border-radius: 12px; transition: all 0.2s ease; cursor: pointer;
+    }
+    .btn-viewer {
+      background: linear-gradient(135deg, #1e3a8a, #581c87);
+      color: white; border: 1px solid rgba(124, 58, 237, 0.5);
+      box-shadow: 0 4px 15px rgba(30, 58, 138, 0.4);
+    }
+    .btn-viewer:hover { transform: scale(1.02); }
+
+    .empty-state {
+      grid-column: 1 / -1; text-align: center;
+      color: var(--muted); font-size: 15px; padding: 40px;
+      background: rgba(17, 17, 24, 0.6); border-radius: 16px; border: 1px dashed var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="visualizer-canvas"></canvas>
+
+  <!-- Top Right Administrator Control Link -->
+  <a href="/admin.html" class="admin-btn-top" title="Studio Control">⚙️</a>
+
+  <div class="container">
+    <div class="header">
+      <div class="status-badge">🎭 Studio Network</div>
+      <h1>Live Show Rooms</h1>
+    </div>
+
+    <div class="shows-grid" id="shows-grid">
+      <div class="empty-state">Loading active shows...</div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Canvas Background
+    const canvas = document.getElementById('visualizer-canvas');
+    const canvasCtx = canvas.getContext('2d');
+    let neurons = [];
+
+    function initNeurons() {
+      neurons = [];
+      const numNeurons = Math.floor((canvas.width * canvas.height) / 22000);
+      for (let i = 0; i < numNeurons; i++) {
+        neurons.push({
+          x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 0.1, vy: (Math.random() - 0.5) * 0.1,
+          baseRadius: Math.random() * 2 + 1,
+          colorShift: Math.random() > 0.5 ? '#1d4ed8' : '#6b21a8'
+        });
+      }
+    }
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initNeurons();
+    }
+
+    function drawBackground() {
+      requestAnimationFrame(drawBackground);
+      canvasCtx.fillStyle = 'rgba(7, 7, 13, 0.25)';
+      canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+      neurons.forEach((n) => {
+        n.x += n.vx; n.y += n.vy;
+        if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+        if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+
+        canvasCtx.beginPath();
+        canvasCtx.arc(n.x, n.y, n.baseRadius, 0, Math.PI * 2);
+        canvasCtx.fillStyle = n.colorShift;
+        canvasCtx.fill();
+      });
+
+      for (let i = 0; i < neurons.length; i++) {
+        for (let j = i + 1; j < neurons.length; j++) {
+          const dx = neurons[i].x - neurons[j].x;
+          const dy = neurons[i].y - neurons[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 110) {
+            const alpha = (1 - dist / 110) * 0.15;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(neurons[i].x, neurons[i].y);
+            canvasCtx.lineTo(neurons[j].x, neurons[j].y);
+            canvasCtx.strokeStyle = `rgba(37, 99, 235, ${alpha})`;
+            canvasCtx.lineWidth = 0.8;
+            canvasCtx.stroke();
+          }
+        }
+      }
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    drawBackground();
+
+    // Fetch and render shows
+    async function loadShows() {
+      try {
+        const res = await fetch('/api/database');
+        const db = await res.json();
+        renderShows(db.shows || []);
+      } catch (err) {
+        console.error("Failed to load shows:", err);
+      }
+    }
+
+    function renderShows(shows) {
+  const grid = document.getElementById('shows-grid');
+  if (!shows || shows.length === 0) {
+    grid.innerHTML = '<div class="empty-state">No active shows created yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = shows.map(show => {
+    // Find active cue list
+    const activeCueList = (show.cueLists || []).find(cl => cl.id === show.activeCueListId) || show.cueLists?.[0];
+    
+    // Safely look up active cue without defaulting to index 0
+    let activeCue = null;
+    if (activeCueList && activeCueList.cues) {
+      if (show.activeCueId) {
+        activeCue = activeCueList.cues.find(c => c.id === show.activeCueId);
+      } else if (show.activeCueIndex !== undefined) {
+        activeCue = activeCueList.cues[show.activeCueIndex];
+      }
+    }
+    
+    let activeLabel = 'Standby';
+    if (activeCue) {
+      // Use .num instead of .number
+      activeLabel = `${activeCue.num ? activeCue.num + ' - ' : ''}${activeCue.name}`;
+    }
+
+    return `
+      <div class="show-card">
+        <div>
+          <div class="show-title">${show.title}</div>
+          <div class="show-active-status">
+            <span class="status-dot"></span> Active: ${activeLabel}
+          </div>
+        </div>
+        <div class="btn-group">
+          <a href="/viewer.html?show=${show.id}" class="btn btn-viewer">📺 Launch Viewer</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+    socket.on('database-updated', (db) => {
+      renderShows(db.shows || []);
+    });
+
+    loadShows();
+  </script>
+</body>
+</html>

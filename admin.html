@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Show Control</title>
+    <style>
+        :root {
+            --bg: #09090b;
+            --card: #141417;
+            --panel: #1e1e24;
+            --border: #2e2e35;
+            --accent: #3b82f6;
+            --go: #16a34a;
+            --stop: #dc2626;
+            --standby: #eab308;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: #f4f4f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-box {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+            width: 300px;
+        }
+
+        .login-box input {
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #a1a1aa;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: white;
+            border-bottom-color: var(--accent);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        input,
+        select,
+        button {
+            background: #27272a;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            cursor: pointer;
+            background: var(--accent);
+            font-weight: 600;
+            border: none;
+            transition: 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.btn-go {
+            background: var(--go);
+            font-size: 24px;
+            font-weight: 900;
+            padding: 16px;
+        }
+
+        button.btn-stop {
+            background: var(--stop);
+            font-size: 18px;
+            font-weight: 800;
+            padding: 16px;
+        }
+
+        button.btn-danger {
+            background: var(--stop);
+            color: white;
+            font-weight: bold;
+        }
+
+        button.btn-sm {
+            padding: 6px 12px;
+            width: auto;
+            font-size: 12px;
+        }
+
+        button.btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #e4e4e7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr.active-row {
+            background: #1e293b;
+            font-weight: bold;
+        }
+
+        tr.standby-row {
+            background: #3f2e04;
+            outline: 1px solid var(--standby);
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .avatar-preview {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #333;
+            border: 1px solid var(--border);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .waveform-container {
+            position: relative;
+            width: 100%;
+            height: 160px;
+            background: #0d0d11;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            cursor: crosshair;
+            margin-top: 10px;
+        }
+
+        #waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>Admin Login</h2>
+            <input type="password" id="admin-password" placeholder="Enter Password" onkeypress="checkEnter(event)">
+            <button onclick="checkPassword()">Unlock Studio</button>
+            <div id="login-error" style="color: var(--stop); margin-top: 10px; font-size: 14px; display: none;">
+                Incorrect password</div>
+        </div>
+    </div>
+
+    <div class="app">
+        <div class="header-row">
+            <h1>🎭 Show Engine Studio</h1>
+            <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 14px;"
+                onclick="copyViewerLink()">📋 Copy Viewer Link</button>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-live', event)">⚡ Live Control Board</button>
+            <button class="tab-btn" onclick="switchTab('tab-shows', event)">⚙️ Shows & Cast Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-cues', event)">🎶 Song & Stem Builder</button>
+        </div>
+
+        <!-- TAB 1: LIVE CONTROL BOARD -->
+        <div id="tab-live" class="tab-content">
+            <div class="card grid-3">
+                <div>
+                    <label><small>Active Show Room</small></label>
+                    <select id="live-show-select" onchange="onLiveShowChange()"></select>
+                </div>
+                <div>
+                    <label><small>Active Cast</small></label>
+                    <select id="live-cast-select" onchange="onLiveCastChange()"></select>
+                </div>
+                <div>
+                    <label><small>Active Cue List</small></label>
+                    <select id="live-cuelist-select" onchange="onLiveCueListChange()"></select>
+                </div>
+            </div>
+
+            <div class="card grid-2">
+                <button class="btn-go" onclick="triggerGo()">GO [SPACE]</button>
+                <button class="btn-stop" onclick="triggerStop()">STOP [ESC]</button>
+            </div>
+
+            <!-- CUE WAVEFORM SCRUBBER PANEL -->
+            <div class="card">
+                <div class="header-row" style="margin-bottom: 5px;">
+                    <h3>🎛 Active Cue Audio Waveform Scrubber</h3>
+                    <div style="font-size: 13px; color: #a1a1aa;">
+                        Selected Position: <strong id="selected-time-display"
+                            style="color: var(--standby);">00:00.0</strong> /
+                        Current: <strong id="current-time-display" style="color: var(--accent);">00:00.0</strong> /
+                        Total: <strong id="total-time-display" style="color: white;">00:00.0</strong>
+                    </div>
+                </div>
+
+                <div class="waveform-container" onclick="handleWaveformClick(event)">
+                    <canvas id="waveform-canvas"></canvas>
+                </div>
+
+                <div class="flex-row" style="margin-top: 12px; justify-content: space-between;">
+                    <small style="color: #a1a1aa;">💡 Click anywhere on the real waveform to mark a seek target, then
+                        click Skip.</small>
+                    <button class="btn-sm"
+                        style="background: var(--standby); color: black; font-weight: bold; width: auto; padding: 8px 16px;"
+                        onclick="skipToSelectedPosition()">
+                        ⏩ Skip to Selected Position
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📜 Live Cue Stack</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cue #</th>
+                            <th>Song Title</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-cue-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: SHOWS & CASTS -->
+        <div id="tab-shows" class="tab-content hidden">
+            <div class="card">
+                <h3>➕ Create New Show</h3>
+                <div class="grid-2">
+                    <input type="text" id="new-show-title" placeholder="Show Title (e.g., Musical Main Stage)">
+                    <button onclick="createNewShow()">Create Show</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="header-row" style="margin-bottom: 10px;">
+                    <h3>🛠 Show Settings</h3>
+                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()">🗑️ Delete
+                        Current Show</button>
+                </div>
+                <label><small>Select Show to Edit:</small></label>
+                <select id="edit-show-select" onchange="renderShowSettings()"></select>
+
+                <div class="grid-2" style="margin-top: 15px;">
+                    <div class="panel">
+                        <h4>🎭 1. Define Character Roles</h4>
+                        <div class="flex-row">
+                            <input type="text" id="new-character-name" placeholder="Role Name (e.g., Elphaba)">
+                            <button onclick="addCharacter()">Add Role</button>
+                        </div>
+                        <ul id="character-list" style="margin-top: 15px;"></ul>
+                    </div>
+
+                    <div class="panel">
+                        <h4>👥 2. Define Casts & Lists</h4>
+                        <div class="flex-row">
+                            <input type="text" id="new-cast-name" placeholder="Cast Name (e.g., Cast A)">
+                            <button onclick="addCast()">Add Cast</button>
+                        </div>
+                        <ul id="cast-list" style="margin-top: 10px;"></ul>
+
+                        <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+
+                        <div class="flex-row">
+                            <input type="text" id="new-cuelist-name" placeholder="Cue List Name (e.g., Act 1)">
+                            <button onclick="addCueList()">Add List</button>
+                        </div>
+                        <ul id="cuelist-list" style="margin-top: 10px;"></ul>
+                    </div>
+                </div>
+
+                <div id="cast-roster-container" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SONG & STEM BUILDER -->
+        <div id="tab-cues" class="tab-content hidden">
+            <div class="card grid-2">
+                <div>
+                    <label><small>Select Show:</small></label>
+                    <select id="builder-show-select"
+                        onchange="updateBuilderCueListDropdown(); renderCueBuilder();"></select>
+                </div>
+                <div>
+                    <label><small>Select Cue List:</small></label>
+                    <select id="builder-cuelist-select" onchange="renderCueBuilder()"></select>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>➕ Add New Song (Cue)</h3>
+                <div class="grid-3">
+                    <input type="text" id="cue-num" placeholder="Cue # (e.g., 1)">
+                    <input type="text" id="cue-name" placeholder="Song Title (e.g., Opening Number)">
+                    <button onclick="addSongCue()">Add Song</button>
+                </div>
+            </div>
+
+            <div id="song-editor-container"></div>
+        </div>
+
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let db = { shows: [] };
+        let activeShowId = null;
+        let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false };
+
+        // Scrubber & Clock Sync
+        let playbackCurrentTime = 0;
+        let playbackDuration = 180;
+        let activeCueDuration = 180;     // Duration of the currently playing track
+        let playbackStartTime = 0;
+        let selectedSeekTime = 0;
+        let playheadInterval = null;
+        let currentMetadataAudio = null;
+
+        // Real Audio Waveform Engine
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const waveformCache = new Map(); // url -> Float32Array of peak amplitudes
+
+        function getSortedCues(cues) {
+            if (!cues || !Array.isArray(cues)) return [];
+            return [...cues].sort((a, b) =>
+                String(a.num || '').localeCompare(String(b.num || ''), undefined, { numeric: true, sensitivity: 'base' })
+            );
+        }
+
+        function checkPassword() {
+            if (document.getElementById('admin-password').value === 'jwojcik') {
+                document.getElementById('login-overlay').style.display = 'none';
+                sessionStorage.setItem('admin_auth', 'true');
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+        function checkEnter(e) { if (e.key === 'Enter') checkPassword(); }
+        if (sessionStorage.getItem('admin_auth') === 'true') document.getElementById('login-overlay').style.display = 'none';
+
+        function copyViewerLink() {
+            if (!activeShowId) return alert("❌ Select a Live Show Room first!");
+            const url = `${window.location.origin}/viewer.html?show=${activeShowId}`;
+            navigator.clipboard.writeText(url).then(() => alert('✅ Viewer link copied!'))
+                .catch(() => prompt("Copy link:", url));
+        }
+
+        async function loadDatabase() {
+            const res = await fetch('/api/database');
+            db = await res.json();
+            db.shows.forEach(s => { if (!s.characters) s.characters = []; });
+            if (!activeShowId && db.shows.length > 0) activeShowId = db.shows[0].id;
+            refreshDropdowns();
+            renderAll();
+        }
+
+        socket.on('database-updated', (updatedDb) => {
+            db = updatedDb;
+            db.shows.forEach(s => { if (!s.characters) s.characters = []; });
+            refreshDropdowns();
+            renderAll();
+        });
+
+        socket.on('cue-position-sync', (data) => {
+            if (data.showId === activeShowId) {
+                playbackCurrentTime = data.currentTime;
+                playbackStartTime = Date.now() - (playbackCurrentTime * 1000);
+                if (data.duration) playbackDuration = data.duration;
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-seeked', (data) => {
+            if (data.showId === activeShowId) {
+                playbackCurrentTime = data.position;
+                playbackStartTime = Date.now() - (playbackCurrentTime * 1000);
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-started', (data) => {
+            if (data.showId === activeShowId) {
+                liveState.isPlaying = true;
+                playbackCurrentTime = 0;
+                playbackStartTime = Date.now();
+                selectedSeekTime = 0;
+                startPlayheadTimer();
+                renderLiveTable();
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-stopped', (data) => {
+            if (data.showId === activeShowId) {
+                liveState.isPlaying = false;
+                playbackCurrentTime = 0;
+                stopPlayheadTimer();
+                drawWaveformScrubber();
+                renderLiveTable();
+            }
+        });
+
+        function switchTab(tabId, evt) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.remove('hidden');
+            if (evt) evt.target.classList.add('active');
+            if (tabId === 'tab-live') {
+                syncPlayheadFromTimestamp();
+                drawWaveformScrubber();
+            }
+        }
+
+        async function uploadRawFile(file) {
+            const fd = new FormData(); fd.append('file', file);
+            const res = await fetch('/api/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            return data.url;
+        }
+
+        async function createNewShow() {
+            const title = document.getElementById('new-show-title').value;
+            if (!title) return;
+            await fetch('/api/shows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+            document.getElementById('new-show-title').value = '';
+            await loadDatabase();
+        }
+
+        async function deleteShow() {
+            const show = getSelectedShow('edit-show-select');
+            if (!show || !confirm(`Delete "${show.title}"?`)) return;
+            await fetch(`/api/shows/${show.id}`, { method: 'DELETE' });
+            activeShowId = null;
+            await loadDatabase();
+        }
+
+        async function addCharacter() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-character-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/characters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-character-name').value = '';
+            await loadDatabase();
+        }
+
+        async function editCharacter(showId, charId) {
+            const char = getSelectedShowById(showId).characters.find(c => c.id === charId);
+            const newName = prompt("New name:", char.name);
+            if (newName) {
+                await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
+                await loadDatabase();
+            }
+        }
+
+        async function deleteCharacter(showId, charId) {
+            if (confirm("Delete character?")) {
+                await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'DELETE' });
+                await loadDatabase();
+            }
+        }
+
+        async function addCast() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-cast-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/casts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-cast-name').value = '';
+            await loadDatabase();
+        }
+
+        async function deleteCast(showId, castId) {
+            if (confirm("Delete cast?")) {
+                const res = await fetch(`/api/shows/${showId}/casts/${castId}`, { method: 'DELETE' });
+                if (!res.ok) alert((await res.json()).error);
+                await loadDatabase();
+            }
+        }
+
+        async function updateRosterMember(showId, castId, charId) {
+            const actorInput = document.getElementById(`actor-input-${castId}-${charId}`);
+            const avatarInput = document.getElementById(`avatar-file-${castId}-${charId}`);
+
+            let avatarUrl = undefined;
+            if (avatarInput.files[0]) {
+                avatarUrl = await uploadRawFile(avatarInput.files[0]);
+            }
+
+            await fetch(`/api/shows/${showId}/casts/${castId}/roster/${charId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actor: actorInput.value, avatarUrl })
+            });
+            await loadDatabase();
+        }
+
+        async function addCueList() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-cuelist-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/cuelists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-cuelist-name').value = '';
+            await loadDatabase();
+        }
+
+        async function addSongCue() {
+            const show = getSelectedShow('builder-show-select');
+            const listId = document.getElementById('builder-cuelist-select').value;
+            const num = document.getElementById('cue-num').value;
+            const name = document.getElementById('cue-name').value;
+            if (!show || !listId) return;
+
+            await fetch(`/api/shows/${show.id}/cuelists/${listId}/cues`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num, name })
+            });
+            document.getElementById('cue-num').value = '';
+            document.getElementById('cue-name').value = '';
+            await loadDatabase();
+        }
+
+        async function editSongCue(showId, listId, cueId, currentNum, currentName) {
+            const newNum = prompt("Enter Cue Number:", currentNum);
+            if (newNum === null) return;
+            const newName = prompt("Enter Song Title:", currentName);
+            if (newName === null) return;
+
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num: newNum, name: newName })
+            });
+            await loadDatabase();
+        }
+
+        async function deleteSongCue(showId, listId, cueId, cueName) {
+            if (!confirm(`Are you sure you want to delete Cue "${cueName}"?`)) return;
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                method: 'DELETE'
+            });
+            await loadDatabase();
+        }
+
+        async function uploadInstrumental(input, showId, listId, cueId) {
+            if (!input.files[0]) return;
+            const url = await uploadRawFile(input.files[0]);
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instrumentalUrl: url })
+            });
+            await loadDatabase();
+        }
+
+        async function addStem(showId, listId, cueId, castId) {
+            const charSelect = document.getElementById(`charSelect-${cueId}-${castId}`);
+            const characterId = charSelect.value;
+            const audioFile = document.getElementById(`audio-${cueId}-${castId}`).files[0];
+
+            if (!characterId) return alert("Select a character role.");
+            if (!audioFile) return alert("Audio file is required.");
+
+            const audioUrl = await uploadRawFile(audioFile);
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/stems`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ castId, characterId, audioUrl })
+            });
+            await loadDatabase();
+        }
+
+        async function deleteStem(showId, listId, cueId, castId, index) {
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/stems/${castId}/${index}`, { method: 'DELETE' });
+            await loadDatabase();
+        }
+
+        function renderShowSettings() {
+            const show = getSelectedShow('edit-show-select');
+            if (!show) return;
+
+            document.getElementById('character-list').innerHTML = (show.characters || []).map(c => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${c.name}</strong>
+          <div>
+            <button class="btn-sm" style="background:var(--standby); color:black;" onclick="editCharacter('${show.id}', '${c.id}')">Edit</button>
+            <button class="btn-sm" style="background:var(--stop);" onclick="deleteCharacter('${show.id}', '${c.id}')">Del</button>
+          </div>
+        </li>
+      `).join('');
+
+            document.getElementById('cast-list').innerHTML = show.casts.map(c => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${c.name}</strong>
+          <button class="btn-sm" style="background:var(--stop);" onclick="deleteCast('${show.id}', '${c.id}')">Del</button>
+        </li>
+      `).join('');
+
+            document.getElementById('cuelist-list').innerHTML = show.cueLists.map(l => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${l.name}</strong>
+        </li>
+      `).join('');
+
+            const rosterContainer = document.getElementById('cast-roster-container');
+            rosterContainer.innerHTML = show.casts.map(cast => `
+        <div class="card" style="border-left: 4px solid var(--accent);">
+          <h3>🎭 Roster & Actor Settings for: ${cast.name}</h3>
+          <p><small style="color:#a1a1aa;">Upload actor photos and assign actor names once for this cast.</small></p>
+          
+          ${show.characters.map(char => {
+                const member = (cast.members && cast.members[char.id]) ? cast.members[char.id] : { actor: '', avatarUrl: '' };
+                return `
+              <div class="panel flex-row" style="gap:15px; align-items:center;">
+                <img src="${member.avatarUrl || 'https://via.placeholder.com/40'}" class="avatar-preview">
+                <div style="width:150px;"><strong>${char.name}</strong></div>
+                <input type="text" id="actor-input-${cast.id}-${char.id}" placeholder="Actor Name" value="${member.actor || ''}" style="width:200px;">
+                <input type="file" id="avatar-file-${cast.id}-${char.id}" accept="image/*" style="width:220px;">
+                <button class="btn-sm" onclick="updateRosterMember('${show.id}', '${cast.id}', '${char.id}')">Save Roster Entry</button>
+              </div>
+            `;
+            }).join('')}
+        </div>
+      `).join('');
+        }
+
+        function renderCueBuilder() {
+            const show = getSelectedShow('builder-show-select');
+            const container = document.getElementById('song-editor-container');
+            if (!show) return container.innerHTML = '';
+
+            const listId = document.getElementById('builder-cuelist-select').value;
+            const cueList = show.cueLists.find(cl => cl.id === listId);
+            if (!cueList) return container.innerHTML = '';
+
+            const charOptions = show.characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            const sortedCues = getSortedCues(cueList.cues);
+
+            container.innerHTML = sortedCues.map(cue => `
+        <div class="card" style="border-left: 4px solid var(--accent);">
+          <div class="header-row" style="margin-bottom: 10px;">
+            <h3>🎵 Cue ${cue.num}: ${cue.name}</h3>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">✏️ Edit Cue</button>
+              <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">🗑️ Delete Cue</button>
+            </div>
+          </div>
+          
+          <div class="panel">
+            <h4>Instrumental Track</h4>
+            <div class="flex-row">
+              <input type="file" accept="audio/*" onchange="uploadInstrumental(this, '${show.id}', '${listId}', '${cue.id}')">
+              <span style="color:var(--go);">${cue.instrumentalUrl ? '✅ Track Ready' : '❌ No Audio'}</span>
+            </div>
+          </div>
+
+          ${show.casts.map(cast => {
+                const stems = (cue.castStems && cue.castStems[cast.id]) ? cue.castStems[cast.id] : [];
+                return `
+              <div class="panel">
+                <h4>🎤 Vocal Stems for: ${cast.name}</h4>
+                ${stems.map((stem, idx) => {
+                    const charDef = show.characters.find(c => c.id === stem.characterId);
+                    const member = cast.members ? cast.members[stem.characterId] : null;
+                    return `
+                    <div class="flex-row" style="background:#27272a; padding:8px; border-radius:4px; justify-content:space-between;">
+                      <div class="flex-row" style="margin:0;">
+                        <img src="${member?.avatarUrl || 'https://via.placeholder.com/30'}" class="avatar-preview" style="width:30px; height:30px;">
+                        <strong>${charDef?.name || 'Role'}</strong>
+                        <span style="color:#a1a1aa;">(${member?.actor || 'No Actor Set'})</span>
+                      </div>
+                      <div>
+                        <span style="color:var(--go); font-size:12px; margin-right:10px;">✅ Audio File Attached</span>
+                        <button class="btn-sm" style="background:var(--stop);" onclick="deleteStem('${show.id}', '${listId}', '${cue.id}', '${cast.id}', ${idx})">Remove</button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+                
+                <div class="flex-row" style="margin-top:10px;">
+                  <select id="charSelect-${cue.id}-${cast.id}" style="width:200px;">
+                    <option value="">Select Character Role...</option>
+                    ${charOptions}
+                  </select>
+                  <input type="file" id="audio-${cue.id}-${cast.id}" accept="audio/*">
+                  <button class="btn-sm" onclick="addStem('${show.id}', '${listId}', '${cue.id}', '${cast.id}')">Add Stem Track</button>
+                </div>
+              </div>
+            `;
+            }).join('')}
+        </div>
+      `).join('');
+        }
+
+        async function onLiveShowChange() {
+            activeShowId = document.getElementById('live-show-select').value;
+            socket.emit('join-show', { showId: activeShowId });
+            refreshDropdowns(); renderLiveTable(); drawWaveformScrubber();
+        }
+
+        async function onLiveCastChange() {
+            const activeCastId = document.getElementById('live-cast-select').value;
+            await fetch(`/api/shows/${activeShowId}/active`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activeCastId })
+            });
+            await loadDatabase();
+        }
+
+        async function onLiveCueListChange() {
+            const activeCueListId = document.getElementById('live-cuelist-select').value;
+            await fetch(`/api/shows/${activeShowId}/active`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activeCueListId })
+            });
+            await loadDatabase();
+        }
+
+        // 2. Lock in activeCueDuration when GO is triggered
+        function triggerGo() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return alert("❌ No show selected!");
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            if (!cueList || !sortedCues.length) return alert("❌ No cues available!");
+
+            let cueIndex = liveState.standbyCueIndex || 0;
+            if (cueIndex >= sortedCues.length) cueIndex = 0;
+
+            liveState.activeCueIndex = cueIndex;
+            liveState.isPlaying = true;
+            playbackCurrentTime = 0;
+            playbackStartTime = Date.now();
+            selectedSeekTime = 0;
+
+            // Lock active track duration to current selection on GO
+            activeCueDuration = playbackDuration;
+
+            startPlayheadTimer();
+
+            socket.emit('trigger-cue', { showId: activeShowId, cue: sortedCues[cueIndex], index: cueIndex });
+            renderLiveTable();
+            drawWaveformScrubber();
+        }
+
+        function triggerStop() {
+            liveState.isPlaying = false;
+            playbackCurrentTime = 0;
+            stopPlayheadTimer();
+            drawWaveformScrubber();
+            socket.emit('stop-show', { showId: activeShowId });
+            renderLiveTable();
+        }
+
+        // --- ACCURATE WAVEFORM & CLOCK SCRUBBER LOGIC ---
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(1);
+            return `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`;
+        }
+
+        function syncPlayheadFromTimestamp() {
+            if (liveState.isPlaying && playbackStartTime > 0) {
+                const elapsed = (Date.now() - playbackStartTime) / 1000;
+                playbackCurrentTime = Math.min(playbackDuration, Math.max(0, elapsed));
+            }
+        }
+        // 3. Check timer completion against activeCueDuration instead of playbackDuration
+        function startPlayheadTimer() {
+            stopPlayheadTimer();
+            playheadInterval = setInterval(() => {
+                if (liveState.isPlaying) {
+                    syncPlayheadFromTimestamp();
+                    drawWaveformScrubber();
+
+                    // Auto-stop only when the active track finishes
+                    if (activeCueDuration > 0 && playbackCurrentTime >= activeCueDuration) {
+                        triggerStop();
+                    }
+                }
+            }, 100);
+        }
+
+        function stopPlayheadTimer() {
+            if (playheadInterval) clearInterval(playheadInterval);
+        }
+
+        // 4. Update selected cue metadata without disrupting the playing track
+        function updateSelectedCueDuration() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return;
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            const cue = sortedCues[liveState.standbyCueIndex];
+
+            if (!cue) return;
+
+            let audioUrl = cue.instrumentalUrl || null;
+            if (!audioUrl) {
+                const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+                const stems = (cue.castStems && cue.castStems[activeCastId]) ? cue.castStems[activeCastId] : [];
+                if (stems.length > 0 && stems[0].audioUrl) audioUrl = stems[0].audioUrl;
+            }
+
+            if (audioUrl) {
+                if (currentMetadataAudio) {
+                    currentMetadataAudio.pause();
+                    currentMetadataAudio = null;
+                }
+                const tempAudio = new Audio(audioUrl);
+                currentMetadataAudio = tempAudio;
+                tempAudio.addEventListener('loadedmetadata', () => {
+                    if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+                        playbackDuration = tempAudio.duration;
+
+                        // Only update activeCueDuration if inspecting the active cue
+                        if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                            activeCueDuration = tempAudio.duration;
+                        }
+                        drawWaveformScrubber();
+                    }
+                });
+            } else {
+                playbackDuration = 180;
+                if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                    activeCueDuration = 180;
+                }
+            }
+        }
+
+        function getSelectedCueTracks() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return [];
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            const cue = sortedCues[liveState.standbyCueIndex];
+            if (!cue) return [];
+
+            const tracks = [];
+            if (cue.instrumentalUrl) {
+                tracks.push({ name: 'Instrumental', color: '#3b82f6', url: cue.instrumentalUrl });
+            }
+
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const stems = (cue.castStems && cue.castStems[activeCastId]) ? cue.castStems[activeCastId] : [];
+            stems.forEach((s, idx) => {
+                const charDef = show.characters.find(c => c.id === s.characterId);
+                const colors = ['#16a34a', '#eab308', '#ec4899', '#8b5cf6', '#06b6d4'];
+                tracks.push({
+                    name: charDef?.name || `Stem ${idx + 1}`,
+                    color: colors[idx % colors.length],
+                    url: s.audioUrl
+                });
+            });
+
+            return tracks;
+        }
+
+        // 1. Cache duration along with audio peaks[cite: 1]
+        async function loadAudioPeaks(url, samples = 200) {
+            if (!url) return null;
+            if (waveformCache.has(url)) return waveformCache.get(url);
+
+            waveformCache.set(url, 'loading');
+
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+                const rawData = audioBuffer.getChannelData(0);
+                const blockSize = Math.floor(rawData.length / samples);
+                const peaks = new Float32Array(samples);
+
+                for (let i = 0; i < samples; i++) {
+                    let start = i * blockSize;
+                    let sum = 0;
+                    for (let j = 0; j < blockSize; j++) {
+                        sum += Math.abs(rawData[start + j]);
+                    }
+                    peaks[i] = sum / blockSize;
+                }
+
+                let max = 0;
+                for (let i = 0; i < samples; i++) {
+                    if (peaks[i] > max) max = peaks[i];
+                }
+                if (max > 0) {
+                    for (let i = 0; i < samples; i++) peaks[i] = peaks[i] / max;
+                }
+
+                // Cache both peaks and actual track duration[cite: 1]
+                const data = { peaks, duration: audioBuffer.duration };
+                waveformCache.set(url, data);
+                drawWaveformScrubber();
+                return data;
+            } catch (err) {
+                console.error("Error decoding audio waveform:", url, err);
+                waveformCache.set(url, null);
+                return null;
+            }
+        }
+
+        // 2. Proportional track width rendering in drawWaveformScrubber()[cite: 1]
+        function drawWaveformScrubber() {
+            const canvas = document.getElementById('waveform-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+
+            canvas.width = rect.width * window.devicePixelRatio || 800;
+            canvas.height = rect.height * window.devicePixelRatio || 160;
+
+            const width = canvas.width;
+            const height = canvas.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Grid background lines
+            ctx.strokeStyle = '#1e1e24';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < width; x += width / 12) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+            }
+
+            const tracks = getSelectedCueTracks();
+
+            if (tracks.length === 0) {
+                ctx.fillStyle = '#71717a';
+                ctx.font = `${12 * window.devicePixelRatio}px system-ui`;
+                ctx.fillText("No audio files assigned to this cue.", 15 * window.devicePixelRatio, height / 2);
+                return;
+            }
+
+            const trackHeight = height / tracks.length;
+
+            tracks.forEach((track, tIdx) => {
+                const yCenter = (tIdx * trackHeight) + (trackHeight / 2);
+                const numBars = 200;
+
+                const cachedData = waveformCache.get(track.url);
+
+                if (!cachedData && track.url) {
+                    loadAudioPeaks(track.url, numBars);
+                }
+
+                ctx.fillStyle = track.color;
+                ctx.globalAlpha = 0.65;
+
+                if (cachedData === 'loading') {
+                    ctx.fillStyle = '#52525b';
+                    ctx.font = `${10 * window.devicePixelRatio}px system-ui`;
+                    ctx.fillText(`Decoding waveform for ${track.name}...`, 80 * window.devicePixelRatio, yCenter + 4);
+                } else if (cachedData && cachedData.peaks) {
+                    const peaks = cachedData.peaks;
+                    const trackDuration = cachedData.duration || playbackDuration;
+
+                    // Calculate track rendering width relative to total playback duration[cite: 1]
+                    const trackWidth = Math.min(width, (trackDuration / playbackDuration) * width);
+                    const barWidth = trackWidth / numBars;
+
+                    for (let i = 0; i < numBars; i++) {
+                        const amp = peaks[i] || 0.05;
+                        const barH = Math.max(2, amp * (trackHeight * 0.8));
+                        const x = i * barWidth;
+
+                        ctx.fillRect(x, yCenter - (barH / 2), Math.max(1, barWidth - 1), barH);
+                    }
+                } else {
+                    ctx.fillRect(0, yCenter - 1, width, 2);
+                }
+
+                ctx.globalAlpha = 0.9;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${10 * window.devicePixelRatio}px system-ui`;
+                ctx.fillText(track.name.toUpperCase(), 8 * window.devicePixelRatio, (tIdx * trackHeight) + (14 * window.devicePixelRatio));
+            });
+
+            ctx.globalAlpha = 1.0;
+
+            // Draw Seek Target Marker[cite: 1]
+            if (selectedSeekTime > 0) {
+                const targetX = (selectedSeekTime / playbackDuration) * width;
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 2 * window.devicePixelRatio;
+                ctx.setLineDash([4 * window.devicePixelRatio, 4 * window.devicePixelRatio]);
+                ctx.beginPath(); ctx.moveTo(targetX, 0); ctx.lineTo(targetX, height); ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#eab308';
+                ctx.fillRect(targetX - (25 * window.devicePixelRatio), 2, 50 * window.devicePixelRatio, 14 * window.devicePixelRatio);
+                ctx.fillStyle = '#000000';
+                ctx.font = `bold ${9 * window.devicePixelRatio}px system-ui`;
+                ctx.textAlign = 'center';
+                ctx.fillText('TARGET', targetX, 12 * window.devicePixelRatio);
+                ctx.textAlign = 'left';
+            }
+
+            // Draw Playhead Marker[cite: 1]
+            const isSelectedSongPlaying = liveState.isPlaying && (liveState.activeCueIndex === liveState.standbyCueIndex);
+
+            if (isSelectedSongPlaying) {
+                const playheadX = (playbackCurrentTime / playbackDuration) * width;
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3 * window.devicePixelRatio;
+                ctx.beginPath(); ctx.moveTo(playheadX, 0); ctx.lineTo(playheadX, height); ctx.stroke();
+
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(playheadX, 6 * window.devicePixelRatio, 6 * window.devicePixelRatio, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            document.getElementById('current-time-display').innerText = isSelectedSongPlaying ? formatTime(playbackCurrentTime) : '00:00.0';
+            document.getElementById('total-time-display').innerText = formatTime(playbackDuration);
+            document.getElementById('selected-time-display').innerText = formatTime(selectedSeekTime);
+        }
+
+
+        // Draw Playhead Marker
+        const isSelectedSongPlaying = liveState.isPlaying && (liveState.activeCueIndex === liveState.standbyCueIndex);
+
+        if (isSelectedSongPlaying) {
+            const playheadX = (playbackCurrentTime / playbackDuration) * width;
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 3 * window.devicePixelRatio;
+            ctx.beginPath(); ctx.moveTo(playheadX, 0); ctx.lineTo(playheadX, height); ctx.stroke();
+
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(playheadX, 6 * window.devicePixelRatio, 6 * window.devicePixelRatio, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Update UI displays
+        document.getElementById('current-time-display').innerText = isSelectedSongPlaying ? formatTime(playbackCurrentTime) : '00:00.0';
+        document.getElementById('total-time-display').innerText = formatTime(playbackDuration);
+        document.getElementById('selected-time-display').innerText = formatTime(selectedSeekTime);
+
+
+        function handleWaveformClick(e) {
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            const canvas = document.getElementById('waveform-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+            selectedSeekTime = ratio * playbackDuration;
+            drawWaveformScrubber();
+        }
+        function skipToSelectedPosition() {
+            if (selectedSeekTime <= 0) return alert("💡 Click a position on the waveform scrubber first!");
+
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return;
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+
+            // Check if we are selecting a new/different track or if playback is stopped
+            const isDifferentTrack = liveState.standbyCueIndex !== liveState.activeCueIndex;
+
+            if (isDifferentTrack || !liveState.isPlaying) {
+                // Switch active track to selected standby cue
+                liveState.activeCueIndex = liveState.standbyCueIndex;
+                liveState.isPlaying = true;
+                activeCueDuration = playbackDuration;
+
+                const targetCue = sortedCues[liveState.activeCueIndex];
+                if (targetCue) {
+                    // Trigger the new cue stream across all connected viewers
+                    socket.emit('trigger-cue', {
+                        showId: activeShowId,
+                        cue: targetCue,
+                        index: liveState.activeCueIndex
+                    });
+                }
+            }
+
+            // Set the playhead clock to the target seek position
+            playbackCurrentTime = selectedSeekTime;
+            playbackStartTime = Date.now() - (selectedSeekTime * 1000);
+
+            startPlayheadTimer();
+            renderLiveTable();
+            drawWaveformScrubber();
+
+            // Send seek command so viewers seek directly to the timestamp
+            socket.emit('seek-cue', {
+                showId: activeShowId,
+                position: selectedSeekTime
+            });
+        }
+
+        function renderLiveTable() {
+            const tbody = document.getElementById('live-cue-table');
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return tbody.innerHTML = '';
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+
+            tbody.innerHTML = sortedCues.map((cue, idx) => {
+                let cls = '', status = 'Ready';
+                if (idx === liveState.activeCueIndex && liveState.isPlaying) { cls = 'active-row'; status = '▶ PLAYING'; }
+                else if (idx === liveState.standbyCueIndex) { cls = 'standby-row'; status = 'STANDBY'; }
+                return `<tr class="${cls}" onclick="liveState.standbyCueIndex = ${idx}; selectedSeekTime = 0; updateSelectedCueDuration(); renderLiveTable(); drawWaveformScrubber();">
+          <td>${cue.num}</td><td>${cue.name}</td><td><strong>${status}</strong></td>
+        </tr>`;
+            }).join('');
+        }
+
+        function getSelectedShow(id) { return db.shows.find(s => s.id === (document.getElementById(id) || {}).value); }
+        function getSelectedShowById(id) { return db.shows.find(s => s.id === id); }
+
+        function updateBuilderCueListDropdown() {
+            const builderShow = getSelectedShow('builder-show-select');
+            if (builderShow) {
+                document.getElementById('builder-cuelist-select').innerHTML = builderShow.cueLists.map(cl => `<option value="${cl.id}">${cl.name}</option>`).join('');
+            }
+        }
+
+        function refreshDropdowns() {
+            const opts = db.shows.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
+            ['live-show-select', 'edit-show-select', 'builder-show-select'].forEach(id => {
+                if (document.getElementById(id)) document.getElementById(id).innerHTML = opts;
+            });
+
+            const show = getSelectedShowById(activeShowId);
+            if (show) {
+                document.getElementById('live-cast-select').innerHTML = show.casts.map(c => `<option value="${c.id}" ${c.id === show.activeCastId ? 'selected' : ''}>${c.name}</option>`).join('');
+                document.getElementById('live-cuelist-select').innerHTML = show.cueLists.map(cl => `<option value="${cl.id}" ${cl.id === show.activeCueListId ? 'selected' : ''}>${cl.name}</option>`).join('');
+                document.getElementById('live-show-select').value = activeShowId;
+            }
+            updateBuilderCueListDropdown();
+        }
+
+        function renderAll() {
+            renderShowSettings();
+            renderCueBuilder();
+            renderLiveTable();
+            updateSelectedCueDuration();
+            drawWaveformScrubber();
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && liveState.isPlaying) {
+                syncPlayheadFromTimestamp();
+                drawWaveformScrubber();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('login-overlay').style.display === 'none') {
+                if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); triggerGo(); }
+                if (e.code === 'Escape') { e.preventDefault(); triggerStop(); }
+            }
+        });
+
+        window.addEventListener('resize', () => drawWaveformScrubber());
+
+        loadDatabase();
+    </script>
+</body>
+
+</html>
