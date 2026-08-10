@@ -1,0 +1,14 @@
+{
+  "name": "roblox-web-qlab-waveform",
+  "version": "4.0.0",
+  "description": "Web QLab with Direct Audio Uploads and Waveform Rendering",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "multer": "^1.4.5-lts.2",
+    "socket.io": "^4.8.3"
+  }
+}
