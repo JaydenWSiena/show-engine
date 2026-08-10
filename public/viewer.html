@@ -409,6 +409,7 @@
             constructor() {
                 this.audioCtx = null;
                 this.masterAnalyser = null;
+                this.masterGain = null; // Master gain node used for fade-ins
                 this.stemBuffers = new Map(); // src -> AudioBuffer
                 this.activeInstances = [];   // [{ id, source, gainNode, analyser, levelEl }]
                 this.startTime = 0;
@@ -423,7 +424,15 @@
                     });
                     this.masterAnalyser = this.audioCtx.createAnalyser();
                     this.masterAnalyser.fftSize = 256;
-                    this.masterAnalyser.connect(this.audioCtx.destination);
+
+                    // Create master gain if not present and route through it so we can fade in/out
+                    this.masterGain = this.audioCtx.createGain();
+                    // default to 1.0 so existing behavior remains; unlock flow will set to 0 then ramp up
+                    this.masterGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+
+                    // Connect analyser -> masterGain -> destination
+                    this.masterAnalyser.connect(this.masterGain);
+                    this.masterGain.connect(this.audioCtx.destination);
                 }
                 if (this.audioCtx.state === 'suspended') {
                     this.audioCtx.resume();
@@ -497,6 +506,18 @@
                         levelEl: document.getElementById(`level-${track.id}`)
                     });
                 });
+
+                // If masterGain exists and is currently at 0 (started by unlock), ensure fade is applied
+                if (this.masterGain) {
+                    // If the gain is 0 (we set it on unlock), ramp to 1 over 800ms
+                    try {
+                        const now = this.audioCtx.currentTime;
+                        const current = this.masterGain.gain.value;
+                        if (current === 0) {
+                            this.fadeInMaster(0.8);
+                        }
+                    } catch (e) { }
+                }
             }
 
             updateVolume(trackId, volFloat, isBoosted) {
@@ -526,6 +547,21 @@
                 });
                 this.activeInstances = [];
             }
+
+            // Fade master gain from 0 -> 1 over duration (seconds)
+            fadeInMaster(duration = 0.8) {
+                if (!this.audioCtx || !this.masterGain) return;
+                const now = this.audioCtx.currentTime;
+                try {
+                    // ensure starting from 0
+                    this.masterGain.gain.cancelScheduledValues(now);
+                    this.masterGain.gain.setValueAtTime(0.0, now);
+                    this.masterGain.gain.linearRampToValueAtTime(1.0, now + duration);
+                } catch (e) {
+                    // older browsers fallback
+                    this.masterGain.gain.setValueAtTime(1.0, now + duration);
+                }
+            }
         }
 
         const stemEngine = new BulletproofStemEngine();
@@ -552,6 +588,18 @@
 
         function unlockAudio() {
             stemEngine.initContext();
+
+            // Start the master gain at 0 and fade up smoothly so audio doesn't pop
+            if (stemEngine.audioCtx && stemEngine.masterGain) {
+                try {
+                    const now = stemEngine.audioCtx.currentTime;
+                    stemEngine.masterGain.gain.cancelScheduledValues(now);
+                    stemEngine.masterGain.gain.setValueAtTime(0.0, now);
+                } catch (e) { }
+                // Fade up over 800ms
+                stemEngine.fadeInMaster(0.8);
+            }
+
             audioUnlocked = true;
             document.getElementById('unlock-overlay').style.display = 'none';
 
@@ -698,7 +746,7 @@
             const isBoosted = boostMemory[trackId];
 
             const btn = document.getElementById(`btn-boost-${trackId}`);
-            const strip = document.getElementById(`strip-${trackId}`);
+            const strip = document.getElementById(`strip-${track.id}`);
 
             if (btn) btn.classList.toggle('active', isBoosted);
             if (strip) strip.classList.toggle('boosted', isBoosted);
