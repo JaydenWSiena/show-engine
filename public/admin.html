@@ -1595,6 +1595,74 @@
     `;
         }
 
+        async function executeBandLabImport() {
+            if (!currentBandLabContext) return;
+
+            const { showId, listId, cueId } = currentBandLabContext;
+            const targetCastId = document.getElementById('bl-cast-select')?.value;
+
+            const validFilesToUpload = importedFilesData.filter(d => d.assignment !== 'ignore');
+
+            if (validFilesToUpload.length === 0) {
+                return alert("No files are assigned for import. Please assign at least one stem or instrumental track.");
+            }
+
+            const modalContent = document.getElementById('bandlab-modal-content');
+            modalContent.innerHTML = `
+        <div style="text-align: center; padding: 30px;">
+            <h4>⏳ Uploading & Processing Stems...</h4>
+            <p><small style="color: #a1a1aa;">Please wait while audio files are being uploaded...</small></p>
+        </div>
+    `;
+
+            try {
+                let uploadedInstUrl = null;
+                const uploadedStems = [];
+
+                for (const item of validFilesToUpload) {
+                    // Uploads raw file using your existing upload utility function
+                    const uploadedUrl = await uploadRawFile(item.file);
+
+                    if (item.assignment === 'instrumental') {
+                        uploadedInstUrl = uploadedUrl;
+                    } else {
+                        uploadedStems.push({
+                            characterId: item.assignment,
+                            audioUrl: uploadedUrl
+                        });
+                    }
+                }
+
+                // Send payload to backend
+                const response = await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/batch-import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        castId: targetCastId,
+                        instrumentalUrl: uploadedInstUrl,
+                        stems: uploadedStems
+                    })
+                });
+
+                if (!response.ok) throw new Error("Batch import API request failed.");
+
+                closeBandLabModal();
+
+                // Refresh the UI view if render functions are active
+                if (typeof renderCueBuilder === 'function') {
+                    renderCueBuilder();
+                } else if (typeof loadShowData === 'function') {
+                    loadShowData();
+                }
+
+                alert("✅ BandLab stems successfully imported!");
+
+            } catch (err) {
+                alert("Import failed: " + err.message);
+                renderBandLabModalStep1();
+            }
+        }
+
         async function processSelectedBandLabFiles(fileList) {
             if (!fileList || fileList.length === 0) return;
 
