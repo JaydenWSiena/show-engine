@@ -319,7 +319,8 @@
 
     <div id="upload-progress-container">
         <div style="display:flex; justify-content: space-between; align-items:center;">
-            <strong id="upload-filename" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; color: #f4f4f5;">Uploading...</strong>
+            <strong id="upload-filename"
+                style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; color: #f4f4f5;">Uploading...</strong>
             <span id="upload-percent" style="font-size: 13px; color: var(--accent); font-weight: bold;">0%</span>
         </div>
         <div class="progress-bar-bg">
@@ -339,15 +340,43 @@
 
     <div class="app">
         <div class="header-row">
-            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><circle cx="4" cy="12" r="2"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><circle cx="12" cy="10" r="2"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><circle cx="20" cy="14" r="2"/></svg>Show Engine Studio</h1>
+            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="21" x2="4" y2="14" />
+                    <line x1="4" y1="10" x2="4" y2="3" />
+                    <circle cx="4" cy="12" r="2" />
+                    <line x1="12" y1="21" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12" y2="3" />
+                    <circle cx="12" cy="10" r="2" />
+                    <line x1="20" y1="21" x2="20" y2="16" />
+                    <line x1="20" y1="12" x2="20" y2="3" />
+                    <circle cx="20" cy="14" r="2" />
+                </svg>Show Engine Studio</h1>
             <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 14px;"
-                onclick="copyViewerLink()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="8" height="6" rx="3"/><rect x="13" y="9" width="8" height="6" rx="3"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Copy Viewer Link</button>
+                onclick="copyViewerLink()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="9" width="8" height="6" rx="3" />
+                    <rect x="13" y="9" width="8" height="6" rx="3" />
+                    <line x1="10" y1="12" x2="14" y2="12" />
+                </svg>Copy Viewer Link</button>
         </div>
 
         <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-live', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>Live Control Board</button>
-            <button class="tab-btn" onclick="switchTab('tab-shows', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Shows & Cast Settings</button>
-            <button class="tab-btn" onclick="switchTab('tab-cues', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Song & Stem Builder</button>
+            <button class="tab-btn active" onclick="switchTab('tab-live', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
+                </svg>Live Control Board</button>
+            <button class="tab-btn" onclick="switchTab('tab-shows', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+                </svg>Shows & Cast Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-cues', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                </svg>Song & Stem Builder</button>
         </div>
 
         <!-- TAB 1: LIVE CONTROL BOARD -->
@@ -388,18 +417,36 @@
                 </div>
 
                 <div class="flex-row" style="margin-top: 12px; justify-content: space-between;">
-                    <small style="color: #a1a1aa; display:inline-flex; align-items:center; gap:5px;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Click anywhere on the real waveform to mark a seek target, then
+                    <small style="color: #a1a1aa; display:inline-flex; align-items:center; gap:5px;"><svg class="icon"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>Click anywhere on the real waveform to mark a seek target, then
                         click Skip.</small>
                     <button class="btn-sm"
                         style="background: var(--standby); color: black; font-weight: bold; width: auto; padding: 8px 16px;"
                         onclick="skipToSelectedPosition()">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Skip to Selected Position
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="5,4 15,12 5,20" />
+                            <line x1="19" y1="5" x2="19" y2="19" />
+                        </svg>Skip to Selected Position
                     </button>
                 </div>
             </div>
 
             <div class="card">
-                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Live Cue Stack</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6" />
+                        <line x1="8" y1="12" x2="21" y2="12" />
+                        <line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" />
+                        <line x1="3" y1="12" x2="3.01" y2="12" />
+                        <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>Live Cue Stack</h3>
                 <table>
                     <thead>
                         <tr>
@@ -416,7 +463,11 @@
         <!-- TAB 2: SHOWS & CASTS -->
         <div id="tab-shows" class="tab-content hidden">
             <div class="card">
-                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Show</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>Create New Show</h3>
                 <div class="grid-2">
                     <input type="text" id="new-show-title" placeholder="Show Title (e.g., Musical Main Stage)">
                     <button onclick="createNewShow()">Create Show</button>
@@ -425,8 +476,21 @@
 
             <div class="card">
                 <div class="header-row" style="margin-bottom: 10px;">
-                    <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Show Settings</h3>
-                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
+                    <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+                        </svg>Show Settings</h3>
+                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()"><svg
+                            class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3,6 5,6 21,6" />
+                            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                        </svg>Delete
                         Current Show</button>
                 </div>
                 <label><small>Select Show to Edit:</small></label>
@@ -434,7 +498,11 @@
 
                 <div class="grid-2" style="margin-top: 15px;">
                     <div class="panel">
-                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>1. Define Character Roles</h4>
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>1. Define Character Roles</h4>
                         <div class="flex-row">
                             <input type="text" id="new-character-name" placeholder="Role Name (e.g., Elphaba)">
                             <button onclick="addCharacter()">Add Role</button>
@@ -443,7 +511,13 @@
                     </div>
 
                     <div class="panel">
-                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>2. Define Casts & Lists</h4>
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                <path d="M16 3.13a4 4 0 010 7.75" />
+                            </svg>2. Define Casts & Lists</h4>
                         <div class="flex-row">
                             <input type="text" id="new-cast-name" placeholder="Cast Name (e.g., Cast A)">
                             <button onclick="addCast()">Add Cast</button>
@@ -479,7 +553,11 @@
             </div>
 
             <div class="card">
-                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add New Song (Cue)</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>Add New Song (Cue)</h3>
                 <div class="grid-3">
                     <input type="text" id="cue-num" placeholder="Cue # (e.g., 1)">
                     <input type="text" id="cue-name" placeholder="Song Title (e.g., Opening Number)">
@@ -977,10 +1055,11 @@
           <div class="header-row" style="margin-bottom: 10px;">
             <h3>${icon('music')}Cue ${cue.num}: ${cue.name}</h3>
             <div style="display: flex; gap: 8px;">
-              <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">${icon('pencil')}Edit Cue</button>
-              <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">${icon('trash')}Delete Cue</button>
+                <button class="btn-sm" style="background: var(--accent);" onclick="openBandLabModal('${show.id}', '${listId}', '${cue.id}')">🎛 Import BandLab Stems</button>
+                <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">${icon('pencil')}Edit Cue</button>
+                <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">${icon('trash')}Delete Cue</button>
             </div>
-          </div>
+        </div>
           
           <div class="panel">
             <h4>Instrumental Track</h4>
@@ -1453,6 +1532,260 @@
                 else dirtyTabs[tabId] = true;
             });
         }
+        let currentBandLabContext = null;
+        let importedFilesData = [];
+
+        function closeBandLabModal() {
+            document.getElementById('bandlab-modal').classList.add('hidden');
+            currentBandLabContext = null;
+            importedFilesData = [];
+        }
+
+        function openBandLabModal(showId, listId, cueId) {
+            const show = getSelectedShowById(showId);
+            const cueList = show?.cueLists.find(l => l.id === listId);
+            const cue = cueList?.cues.find(c => c.id === cueId);
+
+            if (!show || !cue) return;
+
+            currentBandLabContext = { showId, listId, cueId, show, cue };
+            importedFilesData = [];
+
+            document.getElementById('bandlab-modal').classList.remove('hidden');
+            renderBandLabModalStep1();
+        }
+
+        function renderBandLabModalStep1() {
+            const { show, cue } = currentBandLabContext;
+            const content = document.getElementById('bandlab-modal-content');
+
+            const castOptions = show.casts.map(c =>
+                `<option value="${c.id}" ${c.id === (show.activeCastId || show.casts[0]?.id) ? 'selected' : ''}>${c.name}</option>`
+            ).join('');
+
+            content.innerHTML = `
+        <div class="panel">
+            <h4>1. Target Cast Roster</h4>
+            <label><small>Confirm which Cast's stems to import into:</small></label>
+            <select id="bl-cast-select" style="margin-top: 5px;">${castOptions}</select>
+        </div>
+
+        <div class="panel" style="margin-top: 15px;">
+            <h4>2. Select BandLab Project Audio Stems</h4>
+            <p><small style="color:#a1a1aa;">Choose multiple exported WAV or MP3 audio files from your BandLab project folder.</small></p>
+            <input type="file" id="bl-files-input" multiple accept="audio/*" onchange="processSelectedBandLabFiles(this.files)">
+        </div>
+
+        <div id="bl-mapping-container" style="margin-top: 15px;"></div>
+    `;
+        }
+
+        async function processSelectedBandLabFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+
+            const { show, cue } = currentBandLabContext;
+            const files = Array.from(fileList);
+            importedFilesData = [];
+
+            const mappingContainer = document.getElementById('bl-mapping-container');
+            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Analyzing stem durations and auto-matching character roles...</p>`;
+
+            // Extract audio metadata / duration for match check
+            for (const file of files) {
+                const duration = await getAudioFileDuration(file);
+
+                // Auto-detect role or instrumental by filename lowercasing
+                const nameLower = file.name.toLowerCase();
+                let matchedType = 'ignore';
+
+                if (nameLower.includes('inst') || nameLower.includes('backing') || nameLower.includes('mix') || nameLower.includes('music')) {
+                    matchedType = 'instrumental';
+                } else {
+                    const matchedChar = show.characters.find(c => nameLower.includes(c.name.toLowerCase()));
+                    if (matchedChar) matchedType = matchedChar.id;
+                }
+
+                importedFilesData.push({
+                    file,
+                    filename: file.name,
+                    duration,
+                    assignment: matchedType
+                });
+            }
+
+            renderBandLabMappingsConfirmation();
+        }
+
+        function getAudioFileDuration(file) {
+            return new Promise((resolve) => {
+                const audio = new Audio();
+                const url = URL.createObjectURL(file);
+                audio.src = url;
+                audio.addEventListener('loadedmetadata', () => {
+                    URL.revokeObjectURL(url);
+                    resolve(audio.duration || 0);
+                });
+                audio.addEventListener('error', () => {
+                    URL.revokeObjectURL(url);
+                    resolve(0);
+                });
+            });
+        }
+
+        function renderBandLabMappingsConfirmation() {
+            const { show, cue } = currentBandLabContext;
+            const container = document.getElementById('bl-mapping-container');
+
+            if (importedFilesData.length === 0) return;
+
+            // --- 1. TRACK MATCH INDICATOR (DURATION EXACTNESS) ---
+            const durations = importedFilesData.map(d => d.duration).filter(d => d > 0);
+            let matchBadge = '';
+            if (durations.length > 0) {
+                const maxDur = Math.max(...durations);
+                const minDur = Math.min(...durations);
+                const diff = Math.abs(maxDur - minDur);
+
+                if (diff <= 0.15) {
+                    matchBadge = `<div class="panel" style="border-left: 4px solid var(--go); background: #064e3b; color: #a7f3d0;">
+                🟢 <strong>Exact Track Match</strong> — All ${durations.length} stems match timing exactly (${formatTime(maxDur)}).
+            </div>`;
+                } else {
+                    matchBadge = `<div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a;">
+                ⚠️ <strong>Track Duration Mismatch</strong> — Stem lengths vary from ${formatTime(minDur)} to ${formatTime(maxDur)}. Double check your export sync points.
+            </div>`;
+                }
+            }
+
+            // --- 2. INSTRUMENTAL CONFLICT CHECK ---
+            const hasExistingInst = Boolean(cue.instrumentalUrl);
+            let instConflictChoiceHtml = '';
+
+            const willImportInst = importedFilesData.some(d => d.assignment === 'instrumental');
+
+            if (hasExistingInst && willImportInst) {
+                instConflictChoiceHtml = `
+            <div class="panel" style="border-left: 4px solid var(--standby); margin-top: 15px;">
+                <h4 style="color: var(--standby);">⚠️ Instrumental Track Conflict</h4>
+                <p><small>An instrumental track already exists on Cue ${cue.num}. Choose which track to keep:</small></p>
+                <div style="display:flex; gap:15px; margin-top:8px;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;">
+                        <input type="radio" name="inst-conflict-opt" value="replace" checked> Replace with New BandLab Instrumental
+                    </label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;">
+                        <input type="radio" name="inst-conflict-opt" value="keep"> Keep Existing Instrumental Track
+                    </label>
+                </div>
+            </div>
+        `;
+            }
+
+            // --- 3. CHARACTER MAPPING TABLE ---
+            const charOptionsHtml = show.characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+            const rowsHtml = importedFilesData.map((item, idx) => `
+        <tr>
+            <td style="font-size: 13px; word-break: break-all;"><strong>${item.filename}</strong></td>
+            <td style="font-size: 13px; color: #a1a1aa;">${formatTime(item.duration)}</td>
+            <td>
+                <select id="bl-assign-${idx}" onchange="importedFilesData[${idx}].assignment = this.value; renderBandLabMappingsConfirmation();">
+                    <option value="ignore" ${item.assignment === 'ignore' ? 'selected' : ''}>❌ Do Not Import</option>
+                    <option value="instrumental" ${item.assignment === 'instrumental' ? 'selected' : ''}>🎵 Instrumental Track</option>
+                    <optgroup label="Character Stems">
+                        ${show.characters.map(c => `<option value="${c.id}" ${item.assignment === c.id ? 'selected' : ''}>👤 ${c.name}</option>`).join('')}
+                    </optgroup>
+                </select>
+            </td>
+        </tr>
+    `).join('');
+
+            container.innerHTML = `
+        ${matchBadge}
+        ${instConflictChoiceHtml}
+
+        <div class="panel" style="margin-top: 15px;">
+            <h4>3. Confirm Track & Character Assignments</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>BandLab File</th>
+                        <th>Duration</th>
+                        <th>Assigned Stem Target</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <button class="btn-go" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 12px;" onclick="executeBandLabImport()">
+                🚀 Execute Stem Import
+            </button>
+        </div>
+    `;
+        }
+
+        async function executeBandLabImport() {
+            const { showId, listId, cueId } = currentBandLabContext;
+            const targetCastId = document.getElementById('bl-cast-select').value;
+
+            // Check instrumental conflict choice
+            const replaceInstRadio = document.querySelector('input[name="inst-conflict-opt"]:checked');
+            const replaceInstrumental = replaceInstRadio ? (replaceInstRadio.value === 'replace') : true;
+
+            const validFilesToUpload = importedFilesData.filter(d => d.assignment !== 'ignore');
+
+            if (validFilesToUpload.length === 0) {
+                return alert("No files are assigned for import. Assign at least one stem or instrumental track.");
+            }
+
+            const modalContent = document.getElementById('bandlab-modal-content');
+            modalContent.innerHTML = `
+        <div style="text-align: center; padding: 30px;">
+            <h4>⏳ Uploading & Processing Stems...</h4>
+            <p><small style="color: #a1a1aa;">Please wait while audio stems are converted and uploaded to DO Spaces.</small></p>
+        </div>
+    `;
+
+            try {
+                let uploadedInstUrl = null;
+                const uploadedStems = [];
+
+                for (const item of validFilesToUpload) {
+                    const uploadedUrl = await uploadRawFile(item.file);
+
+                    if (item.assignment === 'instrumental') {
+                        uploadedInstUrl = uploadedUrl;
+                    } else {
+                        uploadedStems.push({
+                            characterId: item.assignment,
+                            audioUrl: uploadedUrl
+                        });
+                    }
+                }
+
+                // Send atomic batch update to backend API
+                const response = await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/batch-import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        castId: targetCastId,
+                        instrumentalUrl: uploadedInstUrl,
+                        replaceInstrumental,
+                        stems: uploadedStems
+                    })
+                });
+
+                if (!response.ok) throw new Error("Batch import API failed");
+
+                closeBandLabModal();
+                alert("✅ BandLab project stems successfully imported!");
+
+            } catch (err) {
+                alert("Import failed: " + err.message);
+                renderBandLabModalStep1();
+            }
+        }
 
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && liveState.isPlaying) {
@@ -1472,6 +1805,7 @@
 
         loadDatabase();
     </script>
+
 </body>
 
 </html>

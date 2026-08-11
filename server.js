@@ -453,6 +453,44 @@ app.put('/api/shows/:showId/active', (req, res) => {
 	res.json(show);
 });
 
+// BATCH IMPORT BANDLAB STEMS & INSTRUMENTAL
+app.post(
+	'/api/shows/:showId/cuelists/:listId/cues/:cueId/batch-import',
+	(req, res) => {
+		const { castId, instrumentalUrl, replaceInstrumental, stems } = req.body;
+		const db = readDB();
+		const show = db.shows.find((s) => s.id === req.params.showId);
+		const list = show?.cueLists.find((l) => l.id === req.params.listId);
+		const cue = list?.cues.find((c) => c.id === req.params.cueId);
+
+		if (!cue) return res.status(404).json({ error: 'Cue not found' });
+
+		// 1. Handle Instrumental conflict resolution
+		if (instrumentalUrl && (replaceInstrumental || !cue.instrumentalUrl)) {
+			cue.instrumentalUrl = instrumentalUrl;
+		}
+
+		// 2. Handle Cast Stems update
+		if (castId && Array.isArray(stems)) {
+			if (!cue.castStems) cue.castStems = {};
+			if (!cue.castStems[castId]) cue.castStems[castId] = [];
+
+			stems.forEach((newStem) => {
+				cue.castStems[castId] = cue.castStems[castId].filter(
+					(s) => s.characterId !== newStem.characterId
+				);
+				cue.castStems[castId].push({
+					characterId: newStem.characterId,
+					audioUrl: newStem.audioUrl,
+				});
+			});
+		}
+
+		saveDB(db, req.params.showId);
+		res.json(cue);
+	}
+);
+
 // --- SOCKET.IO SHOW ENGINE WITH SEEK & SYNC ---
 const shows = {};
 
