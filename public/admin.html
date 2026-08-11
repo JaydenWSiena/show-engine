@@ -1635,54 +1635,63 @@
         function renderBandLabMappingsConfirmation() {
             const { show, cue } = currentBandLabContext;
             const container = document.getElementById('bl-mapping-container');
+            const selectedCastId = document.getElementById('bl-cast-select')?.value || show.activeCastId || show.casts[0]?.id;
 
             if (importedFilesData.length === 0) return;
 
-            // --- 1. TRACK MATCH INDICATOR (DURATION EXACTNESS) ---
-            const durations = importedFilesData.map(d => d.duration).filter(d => d > 0);
-            let matchBadge = '';
-            if (durations.length > 0) {
-                const maxDur = Math.max(...durations);
-                const minDur = Math.min(...durations);
-                const diff = Math.abs(maxDur - minDur);
+            // --- 1. EXISTING AUDIO WARNING (Ideally Cue Should Be Clean) ---
+            const existingStems = cue.castStems?.[selectedCastId] || [];
+            const hasExistingAudio = cue.instrumentalUrl || existingStems.length > 0;
 
-                if (diff <= 0.15) {
-                    matchBadge = `<div class="panel" style="border-left: 4px solid var(--go); background: #064e3b; color: #a7f3d0;">
-                🟢 <strong>Exact Track Match</strong> — All ${durations.length} stems match timing exactly (${formatTime(maxDur)}).
-            </div>`;
-                } else {
-                    matchBadge = `<div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a;">
-                ⚠️ <strong>Track Duration Mismatch</strong> — Stem lengths vary from ${formatTime(minDur)} to ${formatTime(maxDur)}. Double check your export sync points.
-            </div>`;
-                }
+            let existingAudioWarningHtml = '';
+            if (hasExistingAudio) {
+                existingAudioWarningHtml = `
+            <div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a; margin-bottom: 15px;">
+                ⚠️ <strong>Existing Audio Detected</strong>
+                <p style="margin-top: 4px; font-size: 13px;">This cue already has audio files assigned. Importing these stems will replace the existing audio for this cast.</p>
+            </div>
+        `;
             }
 
-            // --- 2. INSTRUMENTAL CONFLICT CHECK ---
-            const hasExistingInst = Boolean(cue.instrumentalUrl);
-            let instConflictChoiceHtml = '';
+            // --- 2. INSTRUMENTAL TIMING MATCH CHECK ---
+            // Look for an imported instrumental, or fall back to an existing cue instrumental
+            const importedInst = importedFilesData.find(d => d.assignment === 'instrumental');
+            const instDuration = importedInst ? importedInst.duration : null;
 
-            const willImportInst = importedFilesData.some(d => d.assignment === 'instrumental');
+            let matchBadge = '';
 
-            if (hasExistingInst && willImportInst) {
-                instConflictChoiceHtml = `
-            <div class="panel" style="border-left: 4px solid var(--standby); margin-top: 15px;">
-                <h4 style="color: var(--standby);">⚠️ Instrumental Track Conflict</h4>
-                <p><small>An instrumental track already exists on Cue ${cue.num}. Choose which track to keep:</small></p>
-                <div style="display:flex; gap:15px; margin-top:8px;">
-                    <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;">
-                        <input type="radio" name="inst-conflict-opt" value="replace" checked> Replace with New BandLab Instrumental
-                    </label>
-                    <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;">
-                        <input type="radio" name="inst-conflict-opt" value="keep"> Keep Existing Instrumental Track
-                    </label>
+            if (instDuration && instDuration > 0) {
+                // Compare assigned character stems against the instrumental duration
+                const mismatchedStems = importedFilesData.filter(item =>
+                    item.assignment !== 'ignore' &&
+                    item.assignment !== 'instrumental' &&
+                    Math.abs(item.duration - instDuration) > 0.5
+                );
+
+                if (mismatchedStems.length === 0) {
+                    matchBadge = `
+                <div class="panel" style="border-left: 4px solid var(--go); background: #064e3b; color: #a7f3d0; margin-bottom: 15px;">
+                    🟢 <strong>Instrumental Match Verified</strong> — All character stems align with the instrumental length (${formatTime(instDuration)}).
                 </div>
+            `;
+                } else {
+                    const mismatchedNames = mismatchedStems.map(s => s.filename).join(', ');
+                    matchBadge = `
+                <div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a; margin-bottom: 15px;">
+                    ⚠️ <strong>Stem Duration Mismatch</strong> — Stem length differs from the instrumental track (${formatTime(instDuration)}): 
+                    <br><small style="opacity:0.9;">Check file(s): <em>${mismatchedNames}</em></small>
+                </div>
+            `;
+                }
+            } else {
+                matchBadge = `
+            <div class="panel" style="border-left: 4px solid #3b82f6; background: #1e3a8a; color: #bfdbfe; margin-bottom: 15px;">
+                ℹ️ <strong>No Instrumental Track Included</strong> — Select or assign an instrumental file to enable automatic timing alignment checks.
             </div>
         `;
             }
 
             // --- 3. CHARACTER MAPPING TABLE ---
-            const charOptionsHtml = show.characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
             const rowsHtml = importedFilesData.map((item, idx) => `
         <tr>
             <td style="font-size: 13px; word-break: break-all;"><strong>${item.filename}</strong></td>
@@ -1700,17 +1709,17 @@
     `).join('');
 
             container.innerHTML = `
+        ${existingAudioWarningHtml}
         ${matchBadge}
-        ${instConflictChoiceHtml}
 
-        <div class="panel" style="margin-top: 15px;">
+        <div class="panel">
             <h4>3. Confirm Track & Character Assignments</h4>
-            <table>
+            <table style="width:100%; margin-top:10px;">
                 <thead>
                     <tr>
-                        <th>BandLab File</th>
-                        <th>Duration</th>
-                        <th>Assigned Stem Target</th>
+                        <th style="text-align:left;">BandLab File</th>
+                        <th style="text-align:left;">Duration</th>
+                        <th style="text-align:left;">Assigned Role / Track</th>
                     </tr>
                 </thead>
                 <tbody>

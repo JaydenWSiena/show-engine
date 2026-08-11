@@ -15,8 +15,12 @@ const app = express();
 
 // --- HTTPS SSL CERTIFICATE CONFIGURATION ---
 const sslOptions = {
-	key: fs.readFileSync(process.env.SSL_KEY_PATH || path.join(__dirname, 'key.pem')),
-	cert: fs.readFileSync(process.env.SSL_CERT_PATH || path.join(__dirname, 'cert.pem'))
+	key: fs.readFileSync(
+		process.env.SSL_KEY_PATH || path.join(__dirname, 'key.pem')
+	),
+	cert: fs.readFileSync(
+		process.env.SSL_CERT_PATH || path.join(__dirname, 'cert.pem')
+	),
 };
 
 const server = https.createServer(sslOptions, app);
@@ -42,9 +46,9 @@ function convertAudio(inputPath, outputPath) {
 	return new Promise((resolve, reject) => {
 		ffmpeg(inputPath)
 			.audioCodec('pcm_s16le') // 16-bit PCM WAV
-			.audioFrequency(44100)   // 44.1kHz sample rate
-			.audioChannels(2)        // Stereo
-			.format('wav')           // Force WAV container
+			.audioFrequency(44100) // 44.1kHz sample rate
+			.audioChannels(2) // Stereo
+			.format('wav') // Force WAV container
 			.on('end', () => resolve(outputPath))
 			.on('error', (err) => reject(err))
 			.save(outputPath);
@@ -124,7 +128,9 @@ function buildCueTracks(show, cue) {
 	stems.forEach((stem, idx) => {
 		if (!stem.audioUrl) return;
 
-		const charDef = show?.characters?.find((c) => c.id === stem.characterId);
+		const charDef = show?.characters?.find(
+			(c) => c.id === stem.characterId
+		);
 		const memberInfo = activeCast?.members
 			? activeCast.members[stem.characterId]
 			: null;
@@ -154,7 +160,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 	}
 
 	const tempInputPath = req.file.path;
-	const tempOutputPath = path.join('uploads_temp', `converted-${Date.now()}.wav`);
+	const tempOutputPath = path.join(
+		'uploads_temp',
+		`converted-${Date.now()}.wav`
+	);
 
 	try {
 		console.log(`⏳ Converting ${req.file.originalname}...`);
@@ -162,7 +171,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 		const { size: fileSize } = fs.statSync(tempOutputPath);
 		const fileStream = fs.createReadStream(tempOutputPath);
-		const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
+		const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(
+			/\s+/g,
+			'_'
+		)}`;
 
 		const uploadParams = {
 			Bucket: process.env.DO_SPACES_BUCKET,
@@ -179,11 +191,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 		console.log(`✅ Upload successful: ${fileUrl}`);
 		res.json({ url: fileUrl });
-
 	} catch (error) {
 		console.error('❌ Conversion or Upload Failed:', error);
-		res.status(500).json({ error: 'Failed to convert or upload audio file.' });
-
+		res.status(500).json({
+			error: 'Failed to convert or upload audio file.',
+		});
 	} finally {
 		if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
 		if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
@@ -274,8 +286,14 @@ app.put('/api/shows/:showId/casts/:castId/roster/:charId', (req, res) => {
 	if (!cast.members) cast.members = {};
 	const { actor, avatarUrl } = req.body;
 	cast.members[req.params.charId] = {
-		actor: actor !== undefined ? actor : cast.members[req.params.charId]?.actor || '',
-		avatarUrl: avatarUrl !== undefined ? avatarUrl : cast.members[req.params.charId]?.avatarUrl || '',
+		actor:
+			actor !== undefined
+				? actor
+				: cast.members[req.params.charId]?.actor || '',
+		avatarUrl:
+			avatarUrl !== undefined
+				? avatarUrl
+				: cast.members[req.params.charId]?.avatarUrl || '',
 	};
 
 	saveDB(db, req.params.showId);
@@ -447,7 +465,8 @@ app.put('/api/shows/:showId/active', (req, res) => {
 	if (!show) return res.status(404).json({ error: 'Show not found' });
 
 	if (req.body.activeCastId) show.activeCastId = req.body.activeCastId;
-	if (req.body.activeCueListId) show.activeCueListId = req.body.activeCueListId;
+	if (req.body.activeCueListId)
+		show.activeCueListId = req.body.activeCueListId;
 
 	saveDB(db, req.params.showId);
 	res.json(show);
@@ -457,7 +476,7 @@ app.put('/api/shows/:showId/active', (req, res) => {
 app.post(
 	'/api/shows/:showId/cuelists/:listId/cues/:cueId/batch-import',
 	(req, res) => {
-		const { castId, instrumentalUrl, replaceInstrumental, stems } = req.body;
+		const { castId, instrumentalUrl, stems } = req.body;
 		const db = readDB();
 		const show = db.shows.find((s) => s.id === req.params.showId);
 		const list = show?.cueLists.find((l) => l.id === req.params.listId);
@@ -465,25 +484,20 @@ app.post(
 
 		if (!cue) return res.status(404).json({ error: 'Cue not found' });
 
-		// 1. Handle Instrumental conflict resolution
-		if (instrumentalUrl && (replaceInstrumental || !cue.instrumentalUrl)) {
+		// Update instrumental if a new one was uploaded
+		if (instrumentalUrl) {
 			cue.instrumentalUrl = instrumentalUrl;
 		}
 
-		// 2. Handle Cast Stems update
+		// Set stems specifically for this cast
 		if (castId && Array.isArray(stems)) {
 			if (!cue.castStems) cue.castStems = {};
-			if (!cue.castStems[castId]) cue.castStems[castId] = [];
 
-			stems.forEach((newStem) => {
-				cue.castStems[castId] = cue.castStems[castId].filter(
-					(s) => s.characterId !== newStem.characterId
-				);
-				cue.castStems[castId].push({
-					characterId: newStem.characterId,
-					audioUrl: newStem.audioUrl,
-				});
-			});
+			// Clean overwrite for this cast's stems
+			cue.castStems[castId] = stems.map((s) => ({
+				characterId: s.characterId,
+				audioUrl: s.audioUrl,
+			}));
 		}
 
 		saveDB(db, req.params.showId);
@@ -507,8 +521,13 @@ io.on('connection', (socket) => {
 	});
 
 	const sendActiveCueToSocket = (targetSocket, showId) => {
-		if (shows[showId] && shows[showId].activeCue && shows[showId].startTime) {
-			const currentSeekTime = (Date.now() - shows[showId].startTime) / 1000;
+		if (
+			shows[showId] &&
+			shows[showId].activeCue &&
+			shows[showId].startTime
+		) {
+			const currentSeekTime =
+				(Date.now() - shows[showId].startTime) / 1000;
 			targetSocket.emit('cue-triggered', {
 				activeCue: shows[showId].activeCue,
 				currentSeekTime: Math.max(0, currentSeekTime),
@@ -560,10 +579,10 @@ io.on('connection', (socket) => {
 			tracks = rawCue.tracks;
 		}
 
-		const payload = { 
-			id: fullCue?.id, 
-			name: fullCue?.name || 'Cue', 
-			tracks 
+		const payload = {
+			id: fullCue?.id,
+			name: fullCue?.name || 'Cue',
+			tracks,
 		};
 
 		shows[showId] = {
