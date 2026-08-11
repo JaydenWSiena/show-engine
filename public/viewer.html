@@ -362,7 +362,7 @@
 
     <canvas id="visualizer-canvas"></canvas>
 
-    <!-- HTML5 audio element through which all Web Audio is piped to guarantee iOS background playback -->
+    <!-- HTML5 audio element through which Web Audio is piped for iOS/Android background compatibility -->
     <audio id="ios-background-audio" autoplay playsinline style="display:none;"></audio>
 
     <div id="unlock-overlay">
@@ -414,7 +414,7 @@
         }
 
         // ========================================================
-        // SAMPLE-ACCURATE + iOS BACKGROUND COMPATIBLE ENGINE
+        // SAMPLE-ACCURATE + iOS/ANDROID BACKGROUND COMPATIBLE ENGINE
         // ========================================================
         class BulletproofStemEngine {
             constructor() {
@@ -431,8 +431,7 @@
             }
 
             initContext() {
-                if (!this.audioCtx) {
-                    // 'playback' latency hint increases audio buffer size slightly to completely remove iOS background stutter
+                if (!this.audioCtx || this.audioCtx.state === 'closed') {
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
                         latencyHint: 'playback'
                     });
@@ -443,34 +442,35 @@
                     this.masterGain = this.audioCtx.createGain();
                     this.masterGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
 
-                    // Connect chain: Stems -> Master Analyser -> Master Gain
                     this.masterAnalyser.connect(this.masterGain);
-
                     this.iosAudioEl = document.getElementById('ios-background-audio');
 
-                    // UNIFIED PIPELINE FOR iOS / DESKTOP:
-                    // Route Web Audio into MediaStreamDestination -> HTML5 <audio> element.
-                    // This gives iOS full OS-level priority so audio never stutters or pauses in background.
                     if (this.audioCtx.createMediaStreamDestination && this.iosAudioEl) {
                         this.streamDest = this.audioCtx.createMediaStreamDestination();
                         this.masterGain.connect(this.streamDest);
                         this.iosAudioEl.srcObject = this.streamDest.stream;
-                        // NOTE: Do NOT connect masterGain to audioCtx.destination here to avoid duplicate audio!
                     } else {
-                        // Fallback for browsers without MediaStreamDestination
                         this.masterGain.connect(this.audioCtx.destination);
                     }
                 }
 
-                if (this.audioCtx.state === 'suspended') {
-                    this.audioCtx.resume();
-                }
-
-                if (this.iosAudioEl && this.iosAudioEl.paused) {
-                    this.iosAudioEl.play().catch(e => console.log('iOS Audio Playback triggered:', e));
-                }
-
                 this.setupMediaSession();
+            }
+
+            async ensureContextRunning() {
+                if (!this.audioCtx || this.audioCtx.state === 'closed') {
+                    this.initContext();
+                }
+                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                    try {
+                        await this.audioCtx.resume();
+                    } catch (e) {
+                        console.warn('AudioContext resume warning:', e);
+                    }
+                }
+                if (this.iosAudioEl && this.iosAudioEl.paused) {
+                    this.iosAudioEl.play().catch(() => {});
+                }
             }
 
             setupMediaSession() {
@@ -478,14 +478,7 @@
                     this.updateMediaSessionMetadata();
 
                     navigator.mediaSession.setActionHandler('play', async () => {
-                        if (this.audioCtx && this.audioCtx.state === 'suspended') {
-                            await this.audioCtx.resume();
-                        }
-                        if (this.iosAudioEl && this.iosAudioEl.paused) {
-                            this.iosAudioEl.play().catch(() => {});
-                        }
-                        
-                        // Force real-time sync with server/other browsers on play
+                        await this.ensureContextRunning();
                         if (typeof socket !== 'undefined' && socket) {
                             socket.emit('request-current-state', { showId: showId });
                         }
@@ -517,9 +510,32 @@
                 if (this.stemBuffers.has(fullUrl)) return this.stemBuffers.get(fullUrl);
 
                 try {
+                    await this.ensureContextRunning();
                     const res = await fetch(fullUrl);
+                    if (!res.ok) throw new Error(`Fetch failed HTTP ${res.status}`);
                     const arrayBuffer = await res.arrayBuffer();
-                    const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+                    
+                    // Decode with 5s non-blocking fallback timeout to prevent page freezes
+                    const audioBuffer = await new Promise((resolve, reject) => {
+                        let settled = false;
+                        const timer = setTimeout(() => {
+                            if (!settled) {
+                                settled = true;
+                                reject(new Error('Audio decode timeout'));
+                            }
+                        }, 5000);
+
+                        this.audioCtx.decodeAudioData(
+                            arrayBuffer,
+                            (buffer) => {
+                                if (!settled) { settled = true; clearTimeout(timer); resolve(buffer); }
+                            },
+                            (err) => {
+                                if (!settled) { settled = true; clearTimeout(timer); reject(err); }
+                            }
+                        );
+                    });
+
                     this.stemBuffers.set(fullUrl, audioBuffer);
                     return audioBuffer;
                 } catch (err) {
@@ -530,7 +546,7 @@
 
             async preloadAllStems(tracks) {
                 if (!tracks || !Array.isArray(tracks)) return;
-                this.initContext();
+                await this.ensureContextRunning();
                 const loadPromises = tracks.map(track => {
                     const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.instrumentalUrl || track.url);
                     return this.preloadBuffer(src);
@@ -539,7 +555,7 @@
             }
 
             async playTracks(tracks, targetSeekTime = 0) {
-                this.initContext();
+                await this.ensureContextRunning();
                 this.stopAll();
 
                 this.isPlaying = true;
@@ -570,33 +586,37 @@
 
                     if (adjustedSeekTime >= buffer.duration) return;
 
-                    const source = this.audioCtx.createBufferSource();
-                    source.buffer = buffer;
+                    try {
+                        const source = this.audioCtx.createBufferSource();
+                        source.buffer = buffer;
 
-                    const gainNode = this.audioCtx.createGain();
-                    const trackAnalyser = this.audioCtx.createAnalyser();
-                    trackAnalyser.fftSize = 64;
+                        const gainNode = this.audioCtx.createGain();
+                        const trackAnalyser = this.audioCtx.createAnalyser();
+                        trackAnalyser.fftSize = 64;
 
-                    const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
-                    const isBoosted = !!boostMemory[track.id];
-                    const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
+                        const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
+                        const isBoosted = !!boostMemory[track.id];
+                        const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
 
-                    gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
+                        gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
 
-                    source.connect(gainNode);
-                    gainNode.connect(trackAnalyser);
-                    trackAnalyser.connect(this.masterAnalyser);
+                        source.connect(gainNode);
+                        gainNode.connect(trackAnalyser);
+                        trackAnalyser.connect(this.masterAnalyser);
 
-                    source.start(scheduledStartTime, adjustedSeekTime);
+                        source.start(scheduledStartTime, adjustedSeekTime);
 
-                    this.activeInstances.push({
-                        id: track.id,
-                        src: rawSrc,
-                        source: source,
-                        gainNode: gainNode,
-                        analyser: trackAnalyser,
-                        levelEl: document.getElementById(`level-${track.id}`)
-                    });
+                        this.activeInstances.push({
+                            id: track.id,
+                            src: rawSrc,
+                            source: source,
+                            gainNode: gainNode,
+                            analyser: trackAnalyser,
+                            levelEl: document.getElementById(`level-${track.id}`)
+                        });
+                    } catch (err) {
+                        console.warn(`Error creating buffer source for track ${track.id}:`, err);
+                    }
                 });
 
                 if (this.iosAudioEl && this.iosAudioEl.paused) {
@@ -623,8 +643,10 @@
                 this.playSessionId++;
                 this.activeInstances.forEach(instance => {
                     try {
-                        instance.source.stop(0);
-                        instance.source.disconnect();
+                        if (instance.source) {
+                            instance.source.stop(0);
+                            instance.source.disconnect();
+                        }
                     } catch (e) { }
                     try { if (instance.gainNode) instance.gainNode.disconnect(); } catch (e) { }
                     try { if (instance.analyser) instance.analyser.disconnect(); } catch (e) { }
@@ -687,8 +709,8 @@
             initNeurons();
         }
 
-        function unlockAudio() {
-            stemEngine.initContext();
+        async function unlockAudio() {
+            await stemEngine.ensureContextRunning();
 
             if (stemEngine.audioCtx && stemEngine.masterGain) {
                 try {
@@ -717,14 +739,21 @@
             }
         }
 
-        // Auto-resume Audio Context and re-sync when returning from Roblox / background
-        document.addEventListener('visibilitychange', () => {
+        // Auto-recover context and re-sync when switching back from Roblox / other apps
+        let isRecoveringVisibility = false;
+        document.addEventListener('visibilitychange', async () => {
             if (!document.hidden && audioUnlocked) {
-                if (stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
-                    stemEngine.audioCtx.resume();
+                if (isRecoveringVisibility) return;
+                isRecoveringVisibility = true;
+
+                try {
+                    await stemEngine.ensureContextRunning();
+                    socket.emit('request-current-state', { showId: showId });
+                } catch (err) {
+                    console.error("Visibility recovery error:", err);
+                } finally {
+                    setTimeout(() => { isRecoveringVisibility = false; }, 300);
                 }
-                // Request live state from server to align with other browsers
-                socket.emit('request-current-state', { showId: showId });
             }
         });
 
@@ -827,7 +856,6 @@
             document.getElementById('show-status').style.color = "#60a5fa";
             document.getElementById('cue-title').innerText = activeCue.name;
 
-            // Update Lock Screen / Media Session Metadata
             stemEngine.updateMediaSessionMetadata(activeCue.name, document.getElementById('show-title')?.innerText);
 
             const stageContainer = document.getElementById('stage-container');
