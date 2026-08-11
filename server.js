@@ -316,6 +316,14 @@ app.put('/api/shows/:showId/active', (req, res) => {
 const shows = {};
 
 io.on('connection', (socket) => {
+	// Clock sync for network latency & server offset compensation
+	socket.on('clock-sync', (data) => {
+		socket.emit('clock-sync-response', {
+			clientSendTime: data.clientSendTime,
+			serverTime: Date.now(),
+		});
+	});
+
 	// Handle client joining a show channel
 	socket.on('join-show', ({ showId }) => {
 		if (!showId) return;
@@ -330,9 +338,11 @@ io.on('connection', (socket) => {
 			socket.emit('cue-triggered', {
 				activeCue: shows[showId].activeCue,
 				currentSeekTime: Math.max(0, currentSeekTime),
+				serverTimestamp: Date.now(),
 			});
 		}
 	});
+
 	// Trigger a cue for all clients
 	socket.on('trigger-cue', (data) => {
 		const showId = data?.showId || 'main-show';
@@ -399,6 +409,7 @@ io.on('connection', (socket) => {
 		io.to(showId).emit('cue-triggered', {
 			activeCue: payload,
 			currentSeekTime: 0,
+			serverTimestamp: Date.now(),
 		});
 		io.to(showId).emit('cue-started', { showId });
 	});
