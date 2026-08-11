@@ -26,17 +26,23 @@ const s3Client = new S3Client({
 	},
 });
 
-const upload = multer({
-	storage: multerS3({
-		s3: s3Client,
-		bucket: process.env.DO_SPACES_BUCKET,
-		acl: 'public-read', // Makes uploaded audio/images publicly readable
-		key: (req, file, cb) => {
-			const ext = path.extname(file.originalname);
-			cb(null, `uploads/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-		},
-	}),
-});
+// Configure Multer to save temporarily to a local /tmp folder
+const upload = multer({ dest: 'uploads_temp/' });
+
+// Helper function to convert audio using FFmpeg
+function convertAudio(inputPath, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            // Fix encoding parameters:
+            .audioCodec('pcm_s16le') // 16-bit PCM WAV (or use 'libmp3lame' for MP3)
+            .audioFrequency(44100)   // 44.1kHz sample rate
+            .audioChannels(2)        // Stereo
+            .format('wav')           // Force WAV container
+            .on('end', () => resolve(outputPath))
+            .on('error', (err) => reject(err))
+            .save(outputPath);
+    });
+}
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -70,10 +76,49 @@ function saveDB(db) {
 
 app.get('/api/database', (req, res) => res.json(readDB()));
 
-// UPDATED: Multer-S3 attaches the full public Spaces URL to req.file.location
-app.post('/api/upload', upload.single('file'), (req, res) => {
-	if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-	res.json({ url: req.file.location });
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const tempInputPath = req.file.path;
+    const tempOutputPath = path.join('uploads_temp', `converted-${Date.now()}.wav`);
+
+    try {
+        // 1. Convert audio to standard 16-bit PCM WAV
+        console.log(`⏳ Converting ${req.file.originalname}...`);
+        await convertAudio(tempInputPath, tempOutputPath);
+
+        // 2. Read the converted file into a buffer
+        const fileStream = fs.readFileSync(tempOutputPath);
+        const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
+
+        // 3. Upload converted file to DigitalOcean Spaces
+        const uploadParams = {
+            Bucket: process.env.DO_SPACES_BUCKET,
+            Key: fileKey,
+            Body: fileStream,
+            ACL: 'public-read', // Ensures browser can fetch the binary audio stream
+            ContentType: 'audio/wav',
+        };
+
+        await s3Client.send(new PutObjectCommand(uploadParams));
+
+        // Construct full HTTPS public URL
+        const fileUrl = `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com/${fileKey}`;
+
+        console.log(`✅ Upload successful: ${fileUrl}`);
+        res.json({ url: fileUrl });
+
+    } catch (error) {
+        console.error('❌ Conversion or Upload Failed:', error);
+        res.status(500).json({ error: 'Failed to convert or upload audio file.' });
+
+    } finally {
+        // 4. Clean up temporary files on disk
+        if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+        if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
+    }
 });
 
 

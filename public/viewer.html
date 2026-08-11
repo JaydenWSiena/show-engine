@@ -405,6 +405,15 @@
         const urlParams = new URLSearchParams(window.location.search);
         const showId = urlParams.get('show') || 'main-show';
 
+        // Helper to format/ensure full HTTPS URL for fetching audio
+        function getFullUrl(src) {
+            if (!src) return '';
+            if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+                return src;
+            }
+            return `https://${src}`;
+        }
+
         // ========================================================
         // SAMPLE-ACCURATE BULLETPROOF STEM AUDIO ENGINE
         // ========================================================
@@ -441,16 +450,23 @@
 
             async preloadBuffer(src) {
                 if (!src) return null;
+                const fullUrl = getFullUrl(src);
+
+                if (this.stemBuffers.has(fullUrl)) return this.stemBuffers.get(fullUrl);
                 if (this.stemBuffers.has(src)) return this.stemBuffers.get(src);
 
                 try {
-                    const res = await fetch(src);
+                    const res = await fetch(fullUrl);
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status} when fetching stem: ${fullUrl}`);
+                    }
                     const arrayBuffer = await res.arrayBuffer();
                     const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+                    this.stemBuffers.set(fullUrl, audioBuffer);
                     this.stemBuffers.set(src, audioBuffer);
                     return audioBuffer;
                 } catch (err) {
-                    console.error(`❌ Failed to decode audio stem (${src}):`, err);
+                    console.error(`❌ Failed to decode audio stem (${fullUrl}):`, err);
                     return null;
                 }
             }
@@ -460,7 +476,7 @@
                 if (!tracks || !Array.isArray(tracks)) return;
                 this.initContext();
                 const loadPromises = tracks.map(track => {
-                    const src = typeof track === 'string' ? track : track.src || track.audioUrl || track.instrumentalUrl;
+                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.instrumentalUrl || track.url);
                     return this.preloadBuffer(src);
                 });
                 await Promise.all(loadPromises);
@@ -477,7 +493,10 @@
                 const loadStartTime = performance.now();
 
                 // Concurrent preload/fetch (instantaneous if preloaded)
-                const loadPromises = tracks.map(track => this.preloadBuffer(track.src));
+                const loadPromises = tracks.map(track => {
+                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
+                    return this.preloadBuffer(src);
+                });
                 await Promise.all(loadPromises);
 
                 if (!this.isPlaying) return; // Stopped while downloading
@@ -491,7 +510,8 @@
                 this.startTime = scheduledStartTime - adjustedSeekTime;
 
                 tracks.forEach((track) => {
-                    const buffer = this.stemBuffers.get(track.src);
+                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
+                    const buffer = this.stemBuffers.get(src) || this.stemBuffers.get(getFullUrl(src));
                     if (!buffer) return;
 
                     // Skip if seek position exceeds track length
@@ -520,7 +540,7 @@
 
                     this.activeInstances.push({
                         id: track.id,
-                        src: track.src,
+                        src: src,
                         source: source,
                         gainNode: gainNode,
                         analyser: trackAnalyser,

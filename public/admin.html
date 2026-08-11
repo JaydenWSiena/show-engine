@@ -967,10 +967,19 @@
             if (!url) return null;
             if (waveformCache.has(url)) return waveformCache.get(url);
 
+            // Ensure full URL scheme
+            const fullUrl = (url.startsWith('http://') || url.startsWith('https://')) ? url : `https://${url}`;
+
             waveformCache.set(url, 'loading');
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(fullUrl);
+
+                // Catch non-200 HTTP responses (e.g. 403 Forbidden / 404 Not Found)
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Failed to fetch audio file from DigitalOcean.`);
+                }
+
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
@@ -1000,7 +1009,7 @@
                 drawWaveformScrubber();
                 return data;
             } catch (err) {
-                console.error("Error decoding audio waveform:", url, err);
+                console.error("❌ Error decoding audio waveform:", fullUrl, err);
                 waveformCache.set(url, null);
                 return null;
             }
