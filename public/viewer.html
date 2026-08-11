@@ -362,8 +362,8 @@
 
     <canvas id="visualizer-canvas"></canvas>
 
-    <!-- Hidden HTML5 audio tag used to anchor iOS background media playback session -->
-    <audio id="ios-background-audio" playsinline style="display:none;"></audio>
+    <!-- HTML5 audio element through which all Web Audio is piped to guarantee iOS background playback -->
+    <audio id="ios-background-audio" autoplay playsinline style="display:none;"></audio>
 
     <div id="unlock-overlay">
         <h2 style="margin-bottom: 20px;">Ready for the show?</h2>
@@ -402,7 +402,6 @@
 
         let neurons = []; pulses = []; globalOrbitAngle = 0;
         
-        // Support both ?showId= and ?show= parameters seamlessly
         const urlParams = new URLSearchParams(window.location.search);
         const showId = urlParams.get('showId') || urlParams.get('show') || 'main-show';
 
@@ -428,13 +427,14 @@
                 this.activeInstances = [];
                 this.startTime = 0;
                 this.isPlaying = false;
-                this.playSessionId = 0; // Guard against overlapping async loads
+                this.playSessionId = 0;
             }
 
             initContext() {
                 if (!this.audioCtx) {
+                    // 'playback' latency hint increases audio buffer size slightly to completely remove iOS background stutter
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-                        latencyHint: 'interactive'
+                        latencyHint: 'playback'
                     });
 
                     this.masterAnalyser = this.audioCtx.createAnalyser();
@@ -446,18 +446,19 @@
                     // Connect chain: Stems -> Master Analyser -> Master Gain
                     this.masterAnalyser.connect(this.masterGain);
 
-                    // Direct Web Audio output
-                    this.masterGain.connect(this.audioCtx.destination);
+                    this.iosAudioEl = document.getElementById('ios-background-audio');
 
-                    // iOS BACKGROUND PLAYBACK BRIDGE:
-                    if (this.audioCtx.createMediaStreamDestination) {
+                    // UNIFIED PIPELINE FOR iOS / DESKTOP:
+                    // Route Web Audio into MediaStreamDestination -> HTML5 <audio> element.
+                    // This gives iOS full OS-level priority so audio never stutters or pauses in background.
+                    if (this.audioCtx.createMediaStreamDestination && this.iosAudioEl) {
                         this.streamDest = this.audioCtx.createMediaStreamDestination();
                         this.masterGain.connect(this.streamDest);
-
-                        this.iosAudioEl = document.getElementById('ios-background-audio');
-                        if (this.iosAudioEl) {
-                            this.iosAudioEl.srcObject = this.streamDest.stream;
-                        }
+                        this.iosAudioEl.srcObject = this.streamDest.stream;
+                        // NOTE: Do NOT connect masterGain to audioCtx.destination here to avoid duplicate audio!
+                    } else {
+                        // Fallback for browsers without MediaStreamDestination
+                        this.masterGain.connect(this.audioCtx.destination);
                     }
                 }
 
@@ -523,7 +524,7 @@
                 this.stopAll();
 
                 this.isPlaying = true;
-                const currentSessionId = ++this.playSessionId; // Incremented session lock
+                const currentSessionId = ++this.playSessionId;
                 const loadStartTime = performance.now();
 
                 const loadPromises = tracks.map(track => {
@@ -532,7 +533,6 @@
                 });
                 await Promise.all(loadPromises);
 
-                // ABORT if another stop or play action happened while audio was decoding
                 if (!this.isPlaying || currentSessionId !== this.playSessionId) {
                     return;
                 }
@@ -540,7 +540,6 @@
                 const loadDuration = (performance.now() - loadStartTime) / 1000;
                 const adjustedSeekTime = targetSeekTime + loadDuration;
 
-                // Lock to Web Audio clock: start 150ms in future using hardware clock
                 const scheduledStartTime = this.audioCtx.currentTime + 0.150;
                 this.startTime = scheduledStartTime - adjustedSeekTime;
 
@@ -602,7 +601,7 @@
 
             stopAll() {
                 this.isPlaying = false;
-                this.playSessionId++; // Invalidate any running async buffer loads
+                this.playSessionId++;
                 this.activeInstances.forEach(instance => {
                     try {
                         instance.source.stop(0);
@@ -699,7 +698,7 @@
             }
         }
 
-        // Keep Audio Context alive when app is un-minimized on mobile / desktop
+        // Auto-resume Audio Context whenever returning to foreground
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
                 stemEngine.audioCtx.resume();
@@ -708,7 +707,6 @@
 
         socket.emit('join-show', { showId: showId });
 
-        // Database updates only handle metadata/preloading (NEVER TRIGGER PLAYBACK HERE)
         socket.off('database-updated');
         socket.on('database-updated', (db) => {
             updateShowTitleAndPreload(db);
@@ -752,7 +750,6 @@
 
         fetchShowInfo();
 
-        // Single dedicated listener for cue triggers
         socket.off('cue-triggered');
         socket.on('cue-triggered', (state) => {
             if (!audioUnlocked) { pendingCueState = state; return; }
