@@ -1814,7 +1814,16 @@
 
         loadDatabase();
     </script>
-
+<!-- BANDLAB IMPORT MODAL -->
+<div id="bandlab-modal" class="hidden" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center;">
+    <div class="card" style="width: 720px; max-height: 90vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); padding: 25px;">
+        <div class="header-row" style="margin-bottom: 15px;">
+            <h3>🎛 Import BandLab Stems</h3>
+            <button class="btn-sm btn-outline" style="width:auto;" onclick="closeBandLabModal()">✕ Close</button>
+        </div>
+        <div id="bandlab-modal-content"></div>
+    </div>
+</div>
 </body>
 
 </html>
