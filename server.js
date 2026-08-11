@@ -8,7 +8,7 @@ const multer = require('multer');
 const ffmpeg = require('fluent-ffmpeg');
 
 // Add S3 and Multer-S3 imports
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
 
 const app = express();
