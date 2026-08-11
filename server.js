@@ -55,7 +55,15 @@ function convertAudio(inputPath, outputPath) {
 app.use(express.json());
 app.use(express.static('public'));
 
-function readDB() {
+// --- IN-MEMORY DATABASE CACHE ---
+// The DB is loaded from disk once at startup and kept in memory from then on.
+// Every request previously did a synchronous readFileSync/writeFileSync,
+// which blocks Node's single event loop on every API call and socket event -
+// on a live show that can show up as audio-cue timing jitter for everyone
+// connected while a write is in flight. Reads now just return the cached
+// object; writes update the cache immediately (so the app sees the change
+// right away) and persist to disk asynchronously in the background.
+function loadDBFromDisk() {
 	try {
 		if (!fs.existsSync(DB_PATH)) {
 			const initialData = { shows: [] };
@@ -69,14 +77,33 @@ function readDB() {
 	}
 }
 
-function saveDB(db) {
-	try {
-		const tempPath = `${DB_PATH}.tmp`;
-		fs.writeFileSync(tempPath, JSON.stringify(db, null, 2));
-		fs.renameSync(tempPath, DB_PATH);
+let dbCache = loadDBFromDisk();
+
+function readDB() {
+	return dbCache;
+}
+
+function saveDB(db, showId) {
+	dbCache = db;
+
+	// Persist asynchronously, still atomic via temp-file-then-rename.
+	const tempPath = `${DB_PATH}.tmp`;
+	fs.writeFile(tempPath, JSON.stringify(db, null, 2), (writeErr) => {
+		if (writeErr) return console.error('Save DB error:', writeErr);
+		fs.rename(tempPath, DB_PATH, (renameErr) => {
+			if (renameErr) console.error('Save DB rename error:', renameErr);
+		});
+	});
+
+	// Broadcast the change. Most mutations only matter to the show they
+	// belong to (its viewers) and to admin consoles - not to every viewer of
+	// every other show. When the caller knows which show was affected, scope
+	// the emit to that show's room plus the admin room; otherwise (e.g. the
+	// show list itself changing) fall back to a global broadcast, same as before.
+	if (showId) {
+		io.to(showId).to('admin-room').emit('database-updated', db);
+	} else {
 		io.emit('database-updated', db);
-	} catch (err) {
-		console.error('Save DB error:', err);
 	}
 }
 
@@ -148,13 +175,18 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 		console.log(`⏳ Converting ${req.file.originalname}...`);
 		await convertAudio(tempInputPath, tempOutputPath);
 
-		const fileStream = fs.readFileSync(tempOutputPath);
+		// Stream the file to S3 instead of buffering the whole thing into memory
+		// (it was already read once during ffmpeg conversion - no need to hold
+		// a second full copy in RAM just to upload it).
+		const { size: fileSize } = fs.statSync(tempOutputPath);
+		const fileStream = fs.createReadStream(tempOutputPath);
 		const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
 
 		const uploadParams = {
 			Bucket: process.env.DO_SPACES_BUCKET,
 			Key: fileKey,
 			Body: fileStream,
+			ContentLength: fileSize,
 			ACL: 'public-read',
 			ContentType: 'audio/wav',
 		};
@@ -198,7 +230,7 @@ app.post('/api/shows', (req, res) => {
 app.delete('/api/shows/:showId', (req, res) => {
 	const db = readDB();
 	db.shows = db.shows.filter((s) => s.id !== req.params.showId);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json({ success: true });
 });
 
@@ -210,7 +242,7 @@ app.post('/api/shows/:showId/characters', (req, res) => {
 
 	const char = { id: 'char-' + Date.now(), name: req.body.name };
 	show.characters.push(char);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.status(201).json(char);
 });
 
@@ -221,7 +253,7 @@ app.put('/api/shows/:showId/characters/:charId', (req, res) => {
 	if (!char) return res.status(404).json({ error: 'Character not found' });
 
 	char.name = req.body.name;
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(char);
 });
 
@@ -246,7 +278,7 @@ app.delete('/api/shows/:showId/characters/:charId', (req, res) => {
 		})
 	);
 
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json({ success: true });
 });
 
@@ -264,7 +296,7 @@ app.put('/api/shows/:showId/casts/:castId/roster/:charId', (req, res) => {
 		avatarUrl: avatarUrl !== undefined ? avatarUrl : cast.members[req.params.charId]?.avatarUrl || '',
 	};
 
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(cast.members[req.params.charId]);
 });
 
@@ -276,7 +308,7 @@ app.post('/api/shows/:showId/casts', (req, res) => {
 
 	const cast = { id: 'cast-' + Date.now(), name: req.body.name, members: {} };
 	show.casts.push(cast);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.status(201).json(cast);
 });
 
@@ -287,7 +319,7 @@ app.put('/api/shows/:showId/casts/:castId', (req, res) => {
 	if (!cast) return res.status(404).json({ error: 'Cast not found' });
 
 	cast.name = req.body.name;
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(cast);
 });
 
@@ -298,7 +330,7 @@ app.delete('/api/shows/:showId/casts/:castId', (req, res) => {
 		return res.status(400).json({ error: 'Cannot delete last cast' });
 
 	show.casts = show.casts.filter((c) => c.id !== req.params.castId);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json({ success: true });
 });
 
@@ -310,7 +342,7 @@ app.post('/api/shows/:showId/cuelists', (req, res) => {
 
 	const list = { id: 'cuelist-' + Date.now(), name: req.body.name, cues: [] };
 	show.cueLists.push(list);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.status(201).json(list);
 });
 
@@ -321,7 +353,7 @@ app.put('/api/shows/:showId/cuelists/:listId', (req, res) => {
 	if (!list) return res.status(404).json({ error: 'Cue List not found' });
 
 	list.name = req.body.name;
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(list);
 });
 
@@ -332,7 +364,7 @@ app.delete('/api/shows/:showId/cuelists/:listId', (req, res) => {
 		return res.status(400).json({ error: 'Cannot delete last cue list' });
 
 	show.cueLists = show.cueLists.filter((l) => l.id !== req.params.listId);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json({ success: true });
 });
 
@@ -351,7 +383,7 @@ app.post('/api/shows/:showId/cuelists/:listId/cues', (req, res) => {
 		castStems: {},
 	};
 	list.cues.push(cue);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.status(201).json(cue);
 });
 
@@ -363,7 +395,7 @@ app.put('/api/shows/:showId/cuelists/:listId/cues/:cueId', (req, res) => {
 	if (!cue) return res.status(404).json({ error: 'Cue not found' });
 
 	Object.assign(cue, req.body);
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(cue);
 });
 
@@ -385,7 +417,7 @@ app.post(
 		);
 		cue.castStems[castId].push({ characterId, audioUrl });
 
-		saveDB(db);
+		saveDB(db, req.params.showId);
 		res.status(201).json(cue);
 	}
 );
@@ -401,7 +433,7 @@ app.delete(
 
 		if (cue && cue.castStems && cue.castStems[castId]) {
 			cue.castStems[castId].splice(parseInt(index, 10), 1);
-			saveDB(db);
+			saveDB(db, req.params.showId);
 		}
 		res.json({ success: true });
 	}
@@ -415,7 +447,7 @@ app.put('/api/shows/:showId/active', (req, res) => {
 	if (req.body.activeCastId) show.activeCastId = req.body.activeCastId;
 	if (req.body.activeCueListId) show.activeCueListId = req.body.activeCueListId;
 
-	saveDB(db);
+	saveDB(db, req.params.showId);
 	res.json(show);
 });
 
@@ -423,6 +455,13 @@ app.put('/api/shows/:showId/active', (req, res) => {
 const shows = {};
 
 io.on('connection', (socket) => {
+	// Admin consoles need updates for whichever show they're editing, not
+	// just whichever show is currently "live" - so they join a standing
+	// admin room on connect (and reconnect) instead of relying on join-show.
+	socket.on('register-admin', () => {
+		socket.join('admin-room');
+	});
+
 	socket.on('clock-sync', (data) => {
 		socket.emit('clock-sync-response', {
 			clientSendTime: data.clientSendTime,
@@ -478,7 +517,7 @@ io.on('connection', (socket) => {
 			});
 
 			show.activeCueId = fullCue.id;
-			saveDB(db);
+			saveDB(db, showId);
 
 			// Extract tracks using helper
 			tracks = buildCueTracks(show, fullCue);
@@ -537,7 +576,7 @@ io.on('connection', (socket) => {
 		const show = db.shows.find((s) => s.id === target);
 		if (show) {
 			show.activeCueId = null;
-			saveDB(db);
+			saveDB(db, target);
 		}
 
 		io.to(target).emit('cue-stopped', { showId: target });

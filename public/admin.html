@@ -240,6 +240,40 @@
             height: 100%;
             display: block;
         }
+
+        .icon {
+            width: 14px;
+            height: 14px;
+            vertical-align: -2px;
+            flex-shrink: 0;
+        }
+
+        h1 .icon,
+        h3 .icon,
+        h4 .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: -3px;
+            margin-right: 6px;
+        }
+
+        .tab-btn .icon {
+            margin-right: 6px;
+        }
+
+        .status-ok {
+            color: var(--go);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-bad {
+            color: #a1a1aa;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
     </style>
 </head>
 
@@ -257,15 +291,15 @@
 
     <div class="app">
         <div class="header-row">
-            <h1>🎭 Show Engine Studio</h1>
+            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><circle cx="4" cy="12" r="2"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><circle cx="12" cy="10" r="2"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><circle cx="20" cy="14" r="2"/></svg>Show Engine Studio</h1>
             <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 14px;"
-                onclick="copyViewerLink()">📋 Copy Viewer Link</button>
+                onclick="copyViewerLink()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="8" height="6" rx="3"/><rect x="13" y="9" width="8" height="6" rx="3"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Copy Viewer Link</button>
         </div>
 
         <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-live', event)">⚡ Live Control Board</button>
-            <button class="tab-btn" onclick="switchTab('tab-shows', event)">⚙️ Shows & Cast Settings</button>
-            <button class="tab-btn" onclick="switchTab('tab-cues', event)">🎶 Song & Stem Builder</button>
+            <button class="tab-btn active" onclick="switchTab('tab-live', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>Live Control Board</button>
+            <button class="tab-btn" onclick="switchTab('tab-shows', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Shows & Cast Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-cues', event)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Song & Stem Builder</button>
         </div>
 
         <!-- TAB 1: LIVE CONTROL BOARD -->
@@ -307,18 +341,18 @@
                 </div>
 
                 <div class="flex-row" style="margin-top: 12px; justify-content: space-between;">
-                    <small style="color: #a1a1aa;">💡 Click anywhere on the real waveform to mark a seek target, then
+                    <small style="color: #a1a1aa; display:inline-flex; align-items:center; gap:5px;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Click anywhere on the real waveform to mark a seek target, then
                         click Skip.</small>
                     <button class="btn-sm"
                         style="background: var(--standby); color: black; font-weight: bold; width: auto; padding: 8px 16px;"
                         onclick="skipToSelectedPosition()">
-                        ⏩ Skip to Selected Position
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Skip to Selected Position
                     </button>
                 </div>
             </div>
 
             <div class="card">
-                <h3>📜 Live Cue Stack</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Live Cue Stack</h3>
                 <table>
                     <thead>
                         <tr>
@@ -335,7 +369,7 @@
         <!-- TAB 2: SHOWS & CASTS -->
         <div id="tab-shows" class="tab-content hidden">
             <div class="card">
-                <h3>➕ Create New Show</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Show</h3>
                 <div class="grid-2">
                     <input type="text" id="new-show-title" placeholder="Show Title (e.g., Musical Main Stage)">
                     <button onclick="createNewShow()">Create Show</button>
@@ -344,8 +378,8 @@
 
             <div class="card">
                 <div class="header-row" style="margin-bottom: 10px;">
-                    <h3>🛠 Show Settings</h3>
-                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()">🗑️ Delete
+                    <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Show Settings</h3>
+                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
                         Current Show</button>
                 </div>
                 <label><small>Select Show to Edit:</small></label>
@@ -353,7 +387,7 @@
 
                 <div class="grid-2" style="margin-top: 15px;">
                     <div class="panel">
-                        <h4>🎭 1. Define Character Roles</h4>
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>1. Define Character Roles</h4>
                         <div class="flex-row">
                             <input type="text" id="new-character-name" placeholder="Role Name (e.g., Elphaba)">
                             <button onclick="addCharacter()">Add Role</button>
@@ -362,7 +396,7 @@
                     </div>
 
                     <div class="panel">
-                        <h4>👥 2. Define Casts & Lists</h4>
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>2. Define Casts & Lists</h4>
                         <div class="flex-row">
                             <input type="text" id="new-cast-name" placeholder="Cast Name (e.g., Cast A)">
                             <button onclick="addCast()">Add Cast</button>
@@ -398,7 +432,7 @@
             </div>
 
             <div class="card">
-                <h3>➕ Add New Song (Cue)</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add New Song (Cue)</h3>
                 <div class="grid-3">
                     <input type="text" id="cue-num" placeholder="Cue # (e.g., 1)">
                     <input type="text" id="cue-name" placeholder="Song Title (e.g., Opening Number)">
@@ -414,9 +448,25 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        socket.on('connect', () => socket.emit('register-admin'));
         let db = { shows: [] };
         let activeShowId = null;
         let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false };
+
+        // Tabs that received a data update while they weren't visible get
+        // flagged here instead of being fully re-rendered immediately; they
+        // render once, the moment the user actually switches to them.
+        let dirtyTabs = { 'tab-live': false, 'tab-shows': false, 'tab-cues': false };
+        function getActiveTabId() {
+            const visible = document.querySelector('.tab-content:not(.hidden)');
+            return visible ? visible.id : 'tab-live';
+        }
+        function renderTab(tabId) {
+            if (tabId === 'tab-live') { renderLiveTable(); updateSelectedCueDuration(); drawWaveformScrubber(); }
+            else if (tabId === 'tab-shows') { renderShowSettings(); }
+            else if (tabId === 'tab-cues') { renderCueBuilder(); }
+            dirtyTabs[tabId] = false;
+        }
 
         // Scrubber & Clock Sync
         let playbackCurrentTime = 0;
@@ -430,6 +480,22 @@
         // Real Audio Waveform Engine
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const waveformCache = new Map(); // url -> Float32Array of peak amplitudes
+        const durationCache = new Map(); // url -> duration in seconds, once known
+
+        // Simple line-icon set used in place of emoji throughout the UI.
+        const ICON_PATHS = {
+            music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+            pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4z"/>',
+            trash: '<polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>',
+            mic: '<path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+            check: '<polyline points="20,6 9,17 4,12"/>',
+            x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+            user: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        };
+        function icon(name) {
+            const path = ICON_PATHS[name] || '';
+            return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+        }
 
         // Helper function to extract and normalize character stems into a flat array
         function extractTracksFromCue(cue, activeCastId, showCharacters = []) {
@@ -506,9 +572,9 @@
         if (sessionStorage.getItem('admin_auth') === 'true') document.getElementById('login-overlay').style.display = 'none';
 
         function copyViewerLink() {
-            if (!activeShowId) return alert("❌ Select a Live Show Room first!");
+            if (!activeShowId) return alert("Select a Live Show Room first!");
             const url = `${window.location.origin}/viewer.html?show=${activeShowId}`;
-            navigator.clipboard.writeText(url).then(() => alert('✅ Viewer link copied!'))
+            navigator.clipboard.writeText(url).then(() => alert('Viewer link copied!'))
                 .catch(() => prompt("Copy link:", url));
         }
 
@@ -571,7 +637,8 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.remove('hidden');
-            if (evt) evt.target.classList.add('active');
+            if (evt) evt.currentTarget.classList.add('active');
+            if (dirtyTabs[tabId]) renderTab(tabId);
             if (tabId === 'tab-live') {
                 syncPlayheadFromTimestamp();
                 drawWaveformScrubber();
@@ -590,7 +657,6 @@
             if (!title) return;
             await fetch('/api/shows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
             document.getElementById('new-show-title').value = '';
-            await loadDatabase();
         }
 
         async function deleteShow() {
@@ -598,7 +664,6 @@
             if (!show || !confirm(`Delete "${show.title}"?`)) return;
             await fetch(`/api/shows/${show.id}`, { method: 'DELETE' });
             activeShowId = null;
-            await loadDatabase();
         }
 
         async function addCharacter() {
@@ -607,7 +672,6 @@
             if (!show || !name) return;
             await fetch(`/api/shows/${show.id}/characters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
             document.getElementById('new-character-name').value = '';
-            await loadDatabase();
         }
 
         async function editCharacter(showId, charId) {
@@ -615,14 +679,12 @@
             const newName = prompt("New name:", char.name);
             if (newName) {
                 await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
-                await loadDatabase();
             }
         }
 
         async function deleteCharacter(showId, charId) {
             if (confirm("Delete character?")) {
                 await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'DELETE' });
-                await loadDatabase();
             }
         }
 
@@ -632,14 +694,12 @@
             if (!show || !name) return;
             await fetch(`/api/shows/${show.id}/casts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
             document.getElementById('new-cast-name').value = '';
-            await loadDatabase();
         }
 
         async function deleteCast(showId, castId) {
             if (confirm("Delete cast?")) {
                 const res = await fetch(`/api/shows/${showId}/casts/${castId}`, { method: 'DELETE' });
                 if (!res.ok) alert((await res.json()).error);
-                await loadDatabase();
             }
         }
 
@@ -657,7 +717,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ actor: actorInput.value, avatarUrl })
             });
-            await loadDatabase();
         }
 
         async function addCueList() {
@@ -666,7 +725,6 @@
             if (!show || !name) return;
             await fetch(`/api/shows/${show.id}/cuelists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
             document.getElementById('new-cuelist-name').value = '';
-            await loadDatabase();
         }
 
         async function addSongCue() {
@@ -683,7 +741,6 @@
             });
             document.getElementById('cue-num').value = '';
             document.getElementById('cue-name').value = '';
-            await loadDatabase();
         }
 
         async function editSongCue(showId, listId, cueId, currentNum, currentName) {
@@ -697,7 +754,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ num: newNum, name: newName })
             });
-            await loadDatabase();
         }
 
         async function deleteSongCue(showId, listId, cueId, cueName) {
@@ -705,7 +761,6 @@
             await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
                 method: 'DELETE'
             });
-            await loadDatabase();
         }
 
         async function uploadInstrumental(input, showId, listId, cueId) {
@@ -716,7 +771,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ instrumentalUrl: url })
             });
-            await loadDatabase();
         }
 
         async function addStem(showId, listId, cueId, castId) {
@@ -733,12 +787,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ castId, characterId, audioUrl })
             });
-            await loadDatabase();
         }
 
         async function deleteStem(showId, listId, cueId, castId, index) {
             await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/stems/${castId}/${index}`, { method: 'DELETE' });
-            await loadDatabase();
         }
 
         function renderShowSettings() {
@@ -771,7 +823,7 @@
             const rosterContainer = document.getElementById('cast-roster-container');
             rosterContainer.innerHTML = show.casts.map(cast => `
         <div class="card" style="border-left: 4px solid var(--accent);">
-          <h3>🎭 Roster & Actor Settings for: ${cast.name}</h3>
+          <h3>${icon('user')}Roster & Actor Settings for: ${cast.name}</h3>
           <p><small style="color:#a1a1aa;">Upload actor photos and assign actor names once for this cast.</small></p>
           
           ${show.characters.map(char => {
@@ -805,10 +857,10 @@
             container.innerHTML = sortedCues.map(cue => `
         <div class="card" style="border-left: 4px solid var(--accent);">
           <div class="header-row" style="margin-bottom: 10px;">
-            <h3>🎵 Cue ${cue.num}: ${cue.name}</h3>
+            <h3>${icon('music')}Cue ${cue.num}: ${cue.name}</h3>
             <div style="display: flex; gap: 8px;">
-              <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">✏️ Edit Cue</button>
-              <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">🗑️ Delete Cue</button>
+              <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">${icon('pencil')}Edit Cue</button>
+              <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">${icon('trash')}Delete Cue</button>
             </div>
           </div>
           
@@ -816,7 +868,7 @@
             <h4>Instrumental Track</h4>
             <div class="flex-row">
               <input type="file" accept="audio/*" onchange="uploadInstrumental(this, '${show.id}', '${listId}', '${cue.id}')">
-              <span style="color:var(--go);">${cue.instrumentalUrl ? '✅ Track Ready' : '❌ No Audio'}</span>
+              <span style="color:var(--go);">${cue.instrumentalUrl ? `<span class="status-ok">${icon('check')}Track Ready</span>` : `<span class="status-bad">${icon('x')}No Audio</span>`}</span>
             </div>
           </div>
 
@@ -825,7 +877,7 @@
                 const stems = Array.isArray(castStemsRaw) ? castStemsRaw : (castStemsRaw ? Object.values(castStemsRaw) : []);
                 return `
               <div class="panel">
-                <h4>🎤 Vocal Stems for: ${cast.name}</h4>
+                <h4>${icon('mic')}Vocal Stems for: ${cast.name}</h4>
                 ${stems.map((stem, idx) => {
                     const charDef = show.characters.find(c => c.id === stem.characterId);
                     const member = cast.members ? cast.members[stem.characterId] : null;
@@ -837,7 +889,7 @@
                         <span style="color:#a1a1aa;">(${member?.actor || 'No Actor Set'})</span>
                       </div>
                       <div>
-                        <span style="color:var(--go); font-size:12px; margin-right:10px;">✅ Audio File Attached</span>
+                        <span class="status-ok" style="font-size:12px; margin-right:10px;">${icon('check')}Audio File Attached</span>
                         <button class="btn-sm" style="background:var(--stop);" onclick="deleteStem('${show.id}', '${listId}', '${cue.id}', '${cast.id}', ${idx})">Remove</button>
                       </div>
                     </div>
@@ -872,7 +924,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activeCastId })
             });
-            await loadDatabase();
         }
 
         async function onLiveCueListChange() {
@@ -882,15 +933,14 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activeCueListId })
             });
-            await loadDatabase();
         }
 
         function triggerGo() {
             const show = getSelectedShowById(activeShowId);
-            if (!show) return alert("❌ No show selected!");
+            if (!show) return alert("No show selected!");
             const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
             const sortedCues = getSortedCues(cueList?.cues);
-            if (!cueList || !sortedCues.length) return alert("❌ No cues available!");
+            if (!cueList || !sortedCues.length) return alert("No cues available!");
 
             let cueIndex = liveState.standbyCueIndex || 0;
             if (cueIndex >= sortedCues.length) cueIndex = 0;
@@ -970,6 +1020,16 @@
             let audioUrl = tracks.length > 0 ? tracks[0].audioUrl : null;
 
             if (audioUrl) {
+                const cachedDuration = durationCache.get(audioUrl);
+                if (cachedDuration !== undefined) {
+                    playbackDuration = cachedDuration;
+                    if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                        activeCueDuration = cachedDuration;
+                    }
+                    drawWaveformScrubber();
+                    return;
+                }
+
                 if (currentMetadataAudio) {
                     currentMetadataAudio.pause();
                     currentMetadataAudio = null;
@@ -978,6 +1038,7 @@
                 currentMetadataAudio = tempAudio;
                 tempAudio.addEventListener('loadedmetadata', () => {
                     if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+                        durationCache.set(audioUrl, tempAudio.duration);
                         playbackDuration = tempAudio.duration;
 
                         if (liveState.activeCueIndex === liveState.standbyCueIndex) {
@@ -1059,7 +1120,7 @@
                 drawWaveformScrubber();
                 return data;
             } catch (err) {
-                console.error("❌ Error decoding audio waveform:", fullUrl, err);
+                console.error("Error decoding audio waveform:", fullUrl, err);
                 waveformCache.set(url, null);
                 return null;
             }
@@ -1190,7 +1251,7 @@
         }
 
         function skipToSelectedPosition() {
-            if (selectedSeekTime <= 0) return alert("💡 Click a position on the waveform scrubber first!");
+            if (selectedSeekTime <= 0) return alert("Click a position on the waveform scrubber first!");
 
             const show = getSelectedShowById(activeShowId);
             if (!show) return;
@@ -1274,11 +1335,11 @@
         }
 
         function renderAll() {
-            renderShowSettings();
-            renderCueBuilder();
-            renderLiveTable();
-            updateSelectedCueDuration();
-            drawWaveformScrubber();
+            const activeId = getActiveTabId();
+            ['tab-live', 'tab-shows', 'tab-cues'].forEach(tabId => {
+                if (tabId === activeId) renderTab(tabId);
+                else dirtyTabs[tabId] = true;
+            });
         }
 
         document.addEventListener('visibilitychange', () => {
