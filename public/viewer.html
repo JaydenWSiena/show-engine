@@ -401,8 +401,10 @@
         const canvasCtx = canvas.getContext('2d');
 
         let neurons = []; pulses = []; globalOrbitAngle = 0;
+        
+        // Support both ?showId= and ?show= parameters seamlessly
         const urlParams = new URLSearchParams(window.location.search);
-        const showId = urlParams.get('show') || 'main-show';
+        const showId = urlParams.get('showId') || urlParams.get('show') || 'main-show';
 
         function getFullUrl(src) {
             if (!src) return '';
@@ -426,6 +428,7 @@
                 this.activeInstances = [];
                 this.startTime = 0;
                 this.isPlaying = false;
+                this.playSessionId = 0; // Guard against overlapping async loads
             }
 
             initContext() {
@@ -447,7 +450,6 @@
                     this.masterGain.connect(this.audioCtx.destination);
 
                     // iOS BACKGROUND PLAYBACK BRIDGE:
-                    // Pipe Web Audio output into a MediaStream Destination -> HTML5 Audio Element
                     if (this.audioCtx.createMediaStreamDestination) {
                         this.streamDest = this.audioCtx.createMediaStreamDestination();
                         this.masterGain.connect(this.streamDest);
@@ -485,9 +487,7 @@
                         if (this.iosAudioEl) this.iosAudioEl.play();
                     });
 
-                    navigator.mediaSession.setActionHandler('pause', () => {
-                        // Keep audio active for live shows or handle pause
-                    });
+                    navigator.mediaSession.setActionHandler('pause', () => {});
                 }
             }
 
@@ -523,6 +523,7 @@
                 this.stopAll();
 
                 this.isPlaying = true;
+                const currentSessionId = ++this.playSessionId; // Incremented session lock
                 const loadStartTime = performance.now();
 
                 const loadPromises = tracks.map(track => {
@@ -531,13 +532,16 @@
                 });
                 await Promise.all(loadPromises);
 
-                if (!this.isPlaying) return;
+                // ABORT if another stop or play action happened while audio was decoding
+                if (!this.isPlaying || currentSessionId !== this.playSessionId) {
+                    return;
+                }
 
                 const loadDuration = (performance.now() - loadStartTime) / 1000;
                 const adjustedSeekTime = targetSeekTime + loadDuration;
 
-                // Schedule all stems to trigger on the EXACT same audio clock sample
-                const scheduledStartTime = this.audioCtx.currentTime + 0.300;
+                // Lock to Web Audio clock: start 150ms in future using hardware clock
+                const scheduledStartTime = this.audioCtx.currentTime + 0.150;
                 this.startTime = scheduledStartTime - adjustedSeekTime;
 
                 tracks.forEach((track) => {
@@ -598,9 +602,10 @@
 
             stopAll() {
                 this.isPlaying = false;
+                this.playSessionId++; // Invalidate any running async buffer loads
                 this.activeInstances.forEach(instance => {
                     try {
-                        instance.source.stop();
+                        instance.source.stop(0);
                         instance.source.disconnect();
                     } catch (e) { }
                     try { if (instance.gainNode) instance.gainNode.disconnect(); } catch (e) { }
@@ -694,7 +699,7 @@
             }
         }
 
-        // Keep Audio Context alive when app is un-minimized on iOS
+        // Keep Audio Context alive when app is un-minimized on mobile / desktop
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
                 stemEngine.audioCtx.resume();
@@ -703,6 +708,8 @@
 
         socket.emit('join-show', { showId: showId });
 
+        // Database updates only handle metadata/preloading (NEVER TRIGGER PLAYBACK HERE)
+        socket.off('database-updated');
         socket.on('database-updated', (db) => {
             updateShowTitleAndPreload(db);
         });
@@ -745,8 +752,8 @@
 
         fetchShowInfo();
 
+        // Single dedicated listener for cue triggers
         socket.off('cue-triggered');
-        
         socket.on('cue-triggered', (state) => {
             if (!audioUnlocked) { pendingCueState = state; return; }
             pendingCueState = null;
@@ -769,13 +776,17 @@
             playCue(state.activeCue, livePosition);
         }
 
+        socket.off('cue-seeked');
         socket.on('cue-seeked', (data) => {
             if (data && typeof data.position === 'number') {
                 stemEngine.seek(data.position, currentTracksCache);
             }
         });
 
+        socket.off('cue-stopped');
         socket.on('cue-stopped', handleShowStopped);
+
+        socket.off('show-stopped');
         socket.on('show-stopped', handleShowStopped);
 
         function handleShowStopped() {
