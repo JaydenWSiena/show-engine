@@ -4,6 +4,8 @@ show-data.json
 
 ssl/
 
+.DS_Store
+
 # Logs
 logs
 *.log
