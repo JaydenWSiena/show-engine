@@ -1532,16 +1532,25 @@
                 else dirtyTabs[tabId] = true;
             });
         }
+
         let currentBandLabContext = null;
         let importedFilesData = [];
+        let existingInstrumentalDuration = 0;
 
         function closeBandLabModal() {
-            document.getElementById('bandlab-modal').classList.add('hidden');
+            const modal = document.getElementById('bandlab-modal');
+            if (modal) modal.classList.add('hidden');
             currentBandLabContext = null;
             importedFilesData = [];
+            existingInstrumentalDuration = 0;
         }
 
-        function openBandLabModal(showId, listId, cueId) {
+        async function openBandLabModal(showId, listId, cueId) {
+            const modal = document.getElementById('bandlab-modal');
+            if (!modal) {
+                return alert("Error: #bandlab-modal element missing from admin.html");
+            }
+
             const show = getSelectedShowById(showId);
             const cueList = show?.cueLists.find(l => l.id === listId);
             const cue = cueList?.cues.find(c => c.id === cueId);
@@ -1550,8 +1559,14 @@
 
             currentBandLabContext = { showId, listId, cueId, show, cue };
             importedFilesData = [];
+            existingInstrumentalDuration = 0;
 
-            document.getElementById('bandlab-modal').classList.remove('hidden');
+            // Load existing instrumental duration if present for comparison
+            if (cue.instrumentalUrl) {
+                existingInstrumentalDuration = await getAudioUrlDuration(cue.instrumentalUrl);
+            }
+
+            modal.classList.remove('hidden');
             renderBandLabModalStep1();
         }
 
@@ -1566,39 +1581,70 @@
             content.innerHTML = `
         <div class="panel">
             <h4>1. Target Cast Roster</h4>
-            <label><small>Confirm which Cast's stems to import into:</small></label>
+            <label><small>Select target Cast for imported vocal stems:</small></label>
             <select id="bl-cast-select" style="margin-top: 5px;">${castOptions}</select>
         </div>
 
         <div class="panel" style="margin-top: 15px;">
-            <h4>2. Select BandLab Project Audio Stems</h4>
-            <p><small style="color:#a1a1aa;">Choose multiple exported WAV or MP3 audio files from your BandLab project folder.</small></p>
-            <input type="file" id="bl-files-input" multiple accept="audio/*" onchange="processSelectedBandLabFiles(this.files)">
+            <h4>2. Option A: Paste BandLab Link</h4>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+                <input type="text" id="bl-link-input" placeholder="https://www.bandlab.com/join/fj9xamu" style="flex:1;">
+                <button class="btn-sm" style="background:var(--accent); width:auto;" onclick="handleBandLabLinkSubmit()">Import Link</button>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 15px;">
+            <h4>Option B: Select / Drop Exported Stem Files</h4>
+            <input type="file" id="bl-files-input" multiple accept="audio/*" onchange="processSelectedBandLabFiles(this.files)" style="margin-top:8px;">
         </div>
 
         <div id="bl-mapping-container" style="margin-top: 15px;"></div>
     `;
         }
 
+        async function handleBandLabLinkSubmit() {
+            const linkInput = document.getElementById('bl-link-input')?.value?.trim();
+            if (!linkInput) return alert("Please enter a valid BandLab link.");
+
+            const mappingContainer = document.getElementById('bl-mapping-container');
+            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Resolving BandLab link metadata...</p>`;
+
+            try {
+                const response = await fetch('/api/bandlab/fetch-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: linkInput })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    mappingContainer.innerHTML = `
+                <div class="panel" style="border-left:4px solid var(--standby); background:#451a03; color:#fde68a;">
+                    ⚠️ ${result.message}
+                </div>
+            `;
+                }
+            } catch (err) {
+                alert("Failed to resolve link: " + err.message);
+            }
+        }
+
         async function processSelectedBandLabFiles(fileList) {
             if (!fileList || fileList.length === 0) return;
 
-            const { show, cue } = currentBandLabContext;
+            const { show } = currentBandLabContext;
             const files = Array.from(fileList);
             importedFilesData = [];
 
             const mappingContainer = document.getElementById('bl-mapping-container');
-            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Analyzing stem durations and auto-matching character roles...</p>`;
+            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Processing audio stem files...</p>`;
 
-            // Extract audio metadata / duration for match check
             for (const file of files) {
                 const duration = await getAudioFileDuration(file);
-
-                // Auto-detect role or instrumental by filename lowercasing
                 const nameLower = file.name.toLowerCase();
                 let matchedType = 'ignore';
 
-                if (nameLower.includes('inst') || nameLower.includes('backing') || nameLower.includes('mix') || nameLower.includes('music')) {
+                if (nameLower.includes('inst') || nameLower.includes('backing') || nameLower.includes('music') || nameLower.includes('mix')) {
                     matchedType = 'instrumental';
                 } else {
                     const matchedChar = show.characters.find(c => nameLower.includes(c.name.toLowerCase()));
@@ -1616,82 +1662,30 @@
             renderBandLabMappingsConfirmation();
         }
 
-        function getAudioFileDuration(file) {
-            return new Promise((resolve) => {
-                const audio = new Audio();
-                const url = URL.createObjectURL(file);
-                audio.src = url;
-                audio.addEventListener('loadedmetadata', () => {
-                    URL.revokeObjectURL(url);
-                    resolve(audio.duration || 0);
-                });
-                audio.addEventListener('error', () => {
-                    URL.revokeObjectURL(url);
-                    resolve(0);
-                });
-            });
-        }
-
         function renderBandLabMappingsConfirmation() {
             const { show, cue } = currentBandLabContext;
             const container = document.getElementById('bl-mapping-container');
-            const selectedCastId = document.getElementById('bl-cast-select')?.value || show.activeCastId || show.casts[0]?.id;
 
             if (importedFilesData.length === 0) return;
 
-            // --- 1. EXISTING AUDIO WARNING (Ideally Cue Should Be Clean) ---
-            const existingStems = cue.castStems?.[selectedCastId] || [];
-            const hasExistingAudio = cue.instrumentalUrl || existingStems.length > 0;
+            // --- INSTRUMENTAL DURATION MISMATCH WARNING ONLY ---
+            const newInst = importedFilesData.find(d => d.assignment === 'instrumental');
+            let instWarningHtml = '';
 
-            let existingAudioWarningHtml = '';
-            if (hasExistingAudio) {
-                existingAudioWarningHtml = `
-            <div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a; margin-bottom: 15px;">
-                ⚠️ <strong>Existing Audio Detected</strong>
-                <p style="margin-top: 4px; font-size: 13px;">This cue already has audio files assigned. Importing these stems will replace the existing audio for this cast.</p>
-            </div>
-        `;
-            }
-
-            // --- 2. INSTRUMENTAL TIMING MATCH CHECK ---
-            // Look for an imported instrumental, or fall back to an existing cue instrumental
-            const importedInst = importedFilesData.find(d => d.assignment === 'instrumental');
-            const instDuration = importedInst ? importedInst.duration : null;
-
-            let matchBadge = '';
-
-            if (instDuration && instDuration > 0) {
-                // Compare assigned character stems against the instrumental duration
-                const mismatchedStems = importedFilesData.filter(item =>
-                    item.assignment !== 'ignore' &&
-                    item.assignment !== 'instrumental' &&
-                    Math.abs(item.duration - instDuration) > 0.5
-                );
-
-                if (mismatchedStems.length === 0) {
-                    matchBadge = `
-                <div class="panel" style="border-left: 4px solid var(--go); background: #064e3b; color: #a7f3d0; margin-bottom: 15px;">
-                    🟢 <strong>Instrumental Match Verified</strong> — All character stems align with the instrumental length (${formatTime(instDuration)}).
-                </div>
-            `;
-                } else {
-                    const mismatchedNames = mismatchedStems.map(s => s.filename).join(', ');
-                    matchBadge = `
+            if (cue.instrumentalUrl && newInst && existingInstrumentalDuration > 0) {
+                const diff = Math.abs(newInst.duration - existingInstrumentalDuration);
+                if (diff > 0.5) {
+                    instWarningHtml = `
                 <div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a; margin-bottom: 15px;">
-                    ⚠️ <strong>Stem Duration Mismatch</strong> — Stem length differs from the instrumental track (${formatTime(instDuration)}): 
-                    <br><small style="opacity:0.9;">Check file(s): <em>${mismatchedNames}</em></small>
+                    ⚠️ <strong>Instrumental Duration Mismatch Warning</strong>
+                    <p style="margin-top: 4px; font-size: 13px;">
+                        The uploaded instrumental track duration (<strong>${formatTime(newInst.duration)}</strong>) does not match the existing instrumental track duration on this cue (<strong>${formatTime(existingInstrumentalDuration)}</strong>).
+                    </p>
                 </div>
             `;
                 }
-            } else {
-                matchBadge = `
-            <div class="panel" style="border-left: 4px solid #3b82f6; background: #1e3a8a; color: #bfdbfe; margin-bottom: 15px;">
-                ℹ️ <strong>No Instrumental Track Included</strong> — Select or assign an instrumental file to enable automatic timing alignment checks.
-            </div>
-        `;
             }
 
-            // --- 3. CHARACTER MAPPING TABLE ---
             const rowsHtml = importedFilesData.map((item, idx) => `
         <tr>
             <td style="font-size: 13px; word-break: break-all;"><strong>${item.filename}</strong></td>
@@ -1700,7 +1694,7 @@
                 <select id="bl-assign-${idx}" onchange="importedFilesData[${idx}].assignment = this.value; renderBandLabMappingsConfirmation();">
                     <option value="ignore" ${item.assignment === 'ignore' ? 'selected' : ''}>❌ Do Not Import</option>
                     <option value="instrumental" ${item.assignment === 'instrumental' ? 'selected' : ''}>🎵 Instrumental Track</option>
-                    <optgroup label="Character Stems">
+                    <optgroup label="Character Vocal Stems">
                         ${show.characters.map(c => `<option value="${c.id}" ${item.assignment === c.id ? 'selected' : ''}>👤 ${c.name}</option>`).join('')}
                     </optgroup>
                 </select>
@@ -1709,17 +1703,16 @@
     `).join('');
 
             container.innerHTML = `
-        ${existingAudioWarningHtml}
-        ${matchBadge}
+        ${instWarningHtml}
 
         <div class="panel">
-            <h4>3. Confirm Track & Character Assignments</h4>
+            <h4>Confirm Stem Assignments</h4>
             <table style="width:100%; margin-top:10px;">
                 <thead>
                     <tr>
                         <th style="text-align:left;">BandLab File</th>
                         <th style="text-align:left;">Duration</th>
-                        <th style="text-align:left;">Assigned Role / Track</th>
+                        <th style="text-align:left;">Assign To</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1734,66 +1727,22 @@
     `;
         }
 
-        async function executeBandLabImport() {
-            const { showId, listId, cueId } = currentBandLabContext;
-            const targetCastId = document.getElementById('bl-cast-select').value;
+        function getAudioFileDuration(file) {
+            return new Promise((resolve) => {
+                const audio = new Audio();
+                const url = URL.createObjectURL(file);
+                audio.src = url;
+                audio.addEventListener('loadedmetadata', () => { URL.revokeObjectURL(url); resolve(audio.duration || 0); });
+                audio.addEventListener('error', () => { URL.revokeObjectURL(url); resolve(0); });
+            });
+        }
 
-            // Check instrumental conflict choice
-            const replaceInstRadio = document.querySelector('input[name="inst-conflict-opt"]:checked');
-            const replaceInstrumental = replaceInstRadio ? (replaceInstRadio.value === 'replace') : true;
-
-            const validFilesToUpload = importedFilesData.filter(d => d.assignment !== 'ignore');
-
-            if (validFilesToUpload.length === 0) {
-                return alert("No files are assigned for import. Assign at least one stem or instrumental track.");
-            }
-
-            const modalContent = document.getElementById('bandlab-modal-content');
-            modalContent.innerHTML = `
-        <div style="text-align: center; padding: 30px;">
-            <h4>⏳ Uploading & Processing Stems...</h4>
-            <p><small style="color: #a1a1aa;">Please wait while audio stems are converted and uploaded to DO Spaces.</small></p>
-        </div>
-    `;
-
-            try {
-                let uploadedInstUrl = null;
-                const uploadedStems = [];
-
-                for (const item of validFilesToUpload) {
-                    const uploadedUrl = await uploadRawFile(item.file);
-
-                    if (item.assignment === 'instrumental') {
-                        uploadedInstUrl = uploadedUrl;
-                    } else {
-                        uploadedStems.push({
-                            characterId: item.assignment,
-                            audioUrl: uploadedUrl
-                        });
-                    }
-                }
-
-                // Send atomic batch update to backend API
-                const response = await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/batch-import`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        castId: targetCastId,
-                        instrumentalUrl: uploadedInstUrl,
-                        replaceInstrumental,
-                        stems: uploadedStems
-                    })
-                });
-
-                if (!response.ok) throw new Error("Batch import API failed");
-
-                closeBandLabModal();
-                alert("✅ BandLab project stems successfully imported!");
-
-            } catch (err) {
-                alert("Import failed: " + err.message);
-                renderBandLabModalStep1();
-            }
+        function getAudioUrlDuration(url) {
+            return new Promise((resolve) => {
+                const audio = new Audio(url);
+                audio.addEventListener('loadedmetadata', () => resolve(audio.duration || 0));
+                audio.addEventListener('error', () => resolve(0));
+            });
         }
 
         document.addEventListener('visibilitychange', () => {
@@ -1814,16 +1763,18 @@
 
         loadDatabase();
     </script>
-<!-- BANDLAB IMPORT MODAL -->
-<div id="bandlab-modal" class="hidden" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center;">
-    <div class="card" style="width: 720px; max-height: 90vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); padding: 25px;">
-        <div class="header-row" style="margin-bottom: 15px;">
-            <h3>🎛 Import BandLab Stems</h3>
-            <button class="btn-sm btn-outline" style="width:auto;" onclick="closeBandLabModal()">✕ Close</button>
+    <!-- BANDLAB IMPORT MODAL -->
+    <div id="bandlab-modal" class="hidden"
+        style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <div class="card"
+            style="width: 720px; max-height: 90vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); padding: 25px;">
+            <div class="header-row" style="margin-bottom: 15px;">
+                <h3>🎛 Import BandLab Project & Stems</h3>
+                <button class="btn-sm btn-outline" style="width:auto;" onclick="closeBandLabModal()">✕ Close</button>
+            </div>
+            <div id="bandlab-modal-content"></div>
         </div>
-        <div id="bandlab-modal-content"></div>
     </div>
-</div>
 </body>
 
 </html>
