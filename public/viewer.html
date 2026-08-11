@@ -456,78 +456,65 @@
             }
 
             async playTracks(tracks, startOffset = 0) {
-    this.initContext();
-    this.stopAll();
+                this.initContext();
+                this.stopAll();
 
-    this.isPlaying = true;
+                this.isPlaying = true;
 
-    // 1. Mark the timestamp before downloading/decoding starts
-    const loadStartTime = performance.now();
+                // 1. Mark the timestamp before downloading/decoding starts
+                const loadStartTime = performance.now();
 
-    // Pre-decode all stem buffers into memory concurrently
-    const loadPromises = tracks.map(track => this.preloadBuffer(track.src));
-    await Promise.all(loadPromises);
+                // Pre-decode all stem buffers into memory concurrently
+                const loadPromises = tracks.map(track => this.preloadBuffer(track.src));
+                await Promise.all(loadPromises);
 
-    if (!this.isPlaying) return; // Stopped while downloading
+                if (!this.isPlaying) return; // Stopped while downloading
 
-    // 2. Calculate elapsed time in seconds during download & decoding
-    const loadDuration = (performance.now() - loadStartTime) / 1000;
-    const adjustedOffset = startOffset + loadDuration;
+                // 2. Calculate elapsed time in seconds during download & decoding
+                const loadDuration = (performance.now() - loadStartTime) / 1000;
+                const adjustedOffset = startOffset + loadDuration;
 
-    // Schedule ALL audio sources to trigger on the EXACT same sample tick (+100ms offset)
-    const scheduledStartTime = this.audioCtx.currentTime + 0.100;
-    this.startTime = scheduledStartTime - adjustedOffset;
+                // Schedule ALL audio sources to trigger on the EXACT same sample tick (+100ms offset)
+                const scheduledStartTime = this.audioCtx.currentTime + 0.100;
+                this.startTime = scheduledStartTime - adjustedOffset;
 
-    tracks.forEach((track) => {
-        const buffer = this.stemBuffers.get(track.src);
-        if (!buffer) return;
+                tracks.forEach((track) => {
+                    const buffer = this.stemBuffers.get(track.src);
+                    if (!buffer) return;
 
-        // Skip playing if track duration is already exceeded
-        if (adjustedOffset >= buffer.duration) return;
+                    // Skip playing if track duration is already exceeded
+                    if (adjustedOffset >= buffer.duration) return;
 
-        const source = this.audioCtx.createBufferSource();
-        source.buffer = buffer;
+                    const source = this.audioCtx.createBufferSource();
+                    source.buffer = buffer;
 
-        const gainNode = this.audioCtx.createGain();
-        const trackAnalyser = this.audioCtx.createAnalyser();
-        trackAnalyser.fftSize = 64;
+                    const gainNode = this.audioCtx.createGain();
+                    const trackAnalyser = this.audioCtx.createAnalyser();
+                    trackAnalyser.fftSize = 64;
 
-        const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
-        const isBoosted = !!boostMemory[track.id];
-        const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
+                    const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
+                    const isBoosted = !!boostMemory[track.id];
+                    const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
 
-        gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
 
-        // Chain: Source -> GainNode -> Track Analyser -> Master Analyser
-        source.connect(gainNode);
-        gainNode.connect(trackAnalyser);
-        trackAnalyser.connect(this.masterAnalyser);
+                    // Chain: Source -> GainNode -> Track Analyser -> Master Analyser
+                    source.connect(gainNode);
+                    gainNode.connect(trackAnalyser);
+                    trackAnalyser.connect(this.masterAnalyser);
 
-        // 3. Start playback using the adjusted seek offset
-        source.start(scheduledStartTime, adjustedOffset);
+                    // 3. Start playback using the adjusted seek offset
+                    source.start(scheduledStartTime, adjustedOffset);
 
-        this.activeInstances.push({
-            id: track.id,
-            src: track.src,
-            source: source,
-            gainNode: gainNode,
-            analyser: trackAnalyser,
-            levelEl: document.getElementById(`level-${track.id}`)
-        });
-    });
-}
-
-                // If masterGain exists and is currently at 0 (started by unlock), ensure fade is applied
-                if (this.masterGain) {
-                    // If the gain is 0 (we set it on unlock), ramp to 1 over 2000ms
-                    try {
-                        const now = this.audioCtx.currentTime;
-                        const current = this.masterGain.gain.value;
-                        if (current === 0) {
-                            this.fadeInMaster(2.0);
-                        }
-                    } catch (e) { }
-                }
+                    this.activeInstances.push({
+                        id: track.id,
+                        src: track.src,
+                        source: source,
+                        gainNode: gainNode,
+                        analyser: trackAnalyser,
+                        levelEl: document.getElementById(`level-${track.id}`)
+                    });
+                });
             }
 
             updateVolume(trackId, volFloat, isBoosted) {
