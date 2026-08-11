@@ -475,20 +475,39 @@
 
             setupMediaSession() {
                 if ('mediaSession' in navigator) {
+                    this.updateMediaSessionMetadata();
+
+                    navigator.mediaSession.setActionHandler('play', async () => {
+                        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                            await this.audioCtx.resume();
+                        }
+                        if (this.iosAudioEl && this.iosAudioEl.paused) {
+                            this.iosAudioEl.play().catch(() => {});
+                        }
+                        
+                        // Force real-time sync with server/other browsers on play
+                        if (typeof socket !== 'undefined' && socket) {
+                            socket.emit('request-current-state', { showId: showId });
+                        }
+                    });
+
+                    navigator.mediaSession.setActionHandler('pause', () => {
+                        if (this.iosAudioEl) this.iosAudioEl.pause();
+                        this.stopAll();
+                    });
+                }
+            }
+
+            updateMediaSessionMetadata(cueName, showName) {
+                if ('mediaSession' in navigator) {
+                    const title = cueName || document.getElementById('cue-title')?.innerText || "Live Performance";
+                    const artist = showName || document.getElementById('show-title')?.innerText || "Live Show";
+
                     navigator.mediaSession.metadata = new MediaMetadata({
-                        title: document.getElementById('cue-title')?.innerText || "Live Performance",
-                        artist: document.getElementById('show-title')?.innerText || "Live Show",
+                        title: title,
+                        artist: artist,
                         album: "Multitrack Live Stream"
                     });
-
-                    navigator.mediaSession.setActionHandler('play', () => {
-                        if (this.audioCtx && this.audioCtx.state === 'suspended') {
-                            this.audioCtx.resume();
-                        }
-                        if (this.iosAudioEl) this.iosAudioEl.play();
-                    });
-
-                    navigator.mediaSession.setActionHandler('pause', () => {});
                 }
             }
 
@@ -698,10 +717,14 @@
             }
         }
 
-        // Auto-resume Audio Context whenever returning to foreground
+        // Auto-resume Audio Context and re-sync when returning from Roblox / background
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
-                stemEngine.audioCtx.resume();
+            if (!document.hidden && audioUnlocked) {
+                if (stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
+                    stemEngine.audioCtx.resume();
+                }
+                // Request live state from server to align with other browsers
+                socket.emit('request-current-state', { showId: showId });
             }
         });
 
@@ -803,6 +826,9 @@
             document.getElementById('show-status').innerText = "▶ Live Now";
             document.getElementById('show-status').style.color = "#60a5fa";
             document.getElementById('cue-title').innerText = activeCue.name;
+
+            // Update Lock Screen / Media Session Metadata
+            stemEngine.updateMediaSessionMetadata(activeCue.name, document.getElementById('show-title')?.innerText);
 
             const stageContainer = document.getElementById('stage-container');
             const bottomConsole = document.getElementById('bottom-console');
