@@ -14,7 +14,6 @@ const multerS3 = require('multer-s3');
 const app = express();
 
 // --- HTTPS SSL CERTIFICATE CONFIGURATION ---
-// Place your key and cert files in the same directory as server.js (or update the paths/env variables)
 const sslOptions = {
 	key: fs.readFileSync(process.env.SSL_KEY_PATH || path.join(__dirname, 'key.pem')),
 	cert: fs.readFileSync(process.env.SSL_CERT_PATH || path.join(__dirname, 'cert.pem'))
@@ -56,13 +55,6 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // --- IN-MEMORY DATABASE CACHE ---
-// The DB is loaded from disk once at startup and kept in memory from then on.
-// Every request previously did a synchronous readFileSync/writeFileSync,
-// which blocks Node's single event loop on every API call and socket event -
-// on a live show that can show up as audio-cue timing jitter for everyone
-// connected while a write is in flight. Reads now just return the cached
-// object; writes update the cache immediately (so the app sees the change
-// right away) and persist to disk asynchronously in the background.
 function loadDBFromDisk() {
 	try {
 		if (!fs.existsSync(DB_PATH)) {
@@ -86,7 +78,6 @@ function readDB() {
 function saveDB(db, showId) {
 	dbCache = db;
 
-	// Persist asynchronously, still atomic via temp-file-then-rename.
 	const tempPath = `${DB_PATH}.tmp`;
 	fs.writeFile(tempPath, JSON.stringify(db, null, 2), (writeErr) => {
 		if (writeErr) return console.error('Save DB error:', writeErr);
@@ -95,11 +86,6 @@ function saveDB(db, showId) {
 		});
 	});
 
-	// Broadcast the change. Most mutations only matter to the show they
-	// belong to (its viewers) and to admin consoles - not to every viewer of
-	// every other show. When the caller knows which show was affected, scope
-	// the emit to that show's room plus the admin room; otherwise (e.g. the
-	// show list itself changing) fall back to a global broadcast, same as before.
 	if (showId) {
 		io.to(showId).to('admin-room').emit('database-updated', db);
 	} else {
@@ -130,14 +116,13 @@ function buildCueTracks(show, cue) {
 	if (cue.castStems && cue.castStems[activeCastId]) {
 		stems = cue.castStems[activeCastId];
 	} else if (cue.castStems) {
-		// Fallback: search across all cast stems if specific active cast list is missing
 		Object.values(cue.castStems).forEach((stemArray) => {
 			if (Array.isArray(stemArray)) stems.push(...stemArray);
 		});
 	}
 
 	stems.forEach((stem, idx) => {
-		if (!stem.audioUrl) return; // Skip invalid entries
+		if (!stem.audioUrl) return;
 
 		const charDef = show?.characters?.find((c) => c.id === stem.characterId);
 		const memberInfo = activeCast?.members
@@ -175,9 +160,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 		console.log(`⏳ Converting ${req.file.originalname}...`);
 		await convertAudio(tempInputPath, tempOutputPath);
 
-		// Stream the file to S3 instead of buffering the whole thing into memory
-		// (it was already read once during ffmpeg conversion - no need to hold
-		// a second full copy in RAM just to upload it).
 		const { size: fileSize } = fs.statSync(tempOutputPath);
 		const fileStream = fs.createReadStream(tempOutputPath);
 		const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
@@ -399,6 +381,26 @@ app.put('/api/shows/:showId/cuelists/:listId/cues/:cueId', (req, res) => {
 	res.json(cue);
 });
 
+// NEW: DELETE CUE ENDPOINT
+app.delete('/api/shows/:showId/cuelists/:listId/cues/:cueId', (req, res) => {
+	const db = readDB();
+	const show = db.shows.find((s) => s.id === req.params.showId);
+	if (!show) return res.status(404).json({ error: 'Show not found' });
+
+	const list = show.cueLists.find((l) => l.id === req.params.listId);
+	if (!list) return res.status(404).json({ error: 'Cue list not found' });
+
+	const initialCount = list.cues.length;
+	list.cues = list.cues.filter((c) => c.id !== req.params.cueId);
+
+	if (list.cues.length === initialCount) {
+		return res.status(404).json({ error: 'Cue not found' });
+	}
+
+	saveDB(db, req.params.showId);
+	res.json({ success: true });
+});
+
 app.post(
 	'/api/shows/:showId/cuelists/:listId/cues/:cueId/stems',
 	(req, res) => {
@@ -455,9 +457,6 @@ app.put('/api/shows/:showId/active', (req, res) => {
 const shows = {};
 
 io.on('connection', (socket) => {
-	// Admin consoles need updates for whichever show they're editing, not
-	// just whichever show is currently "live" - so they join a standing
-	// admin room on connect (and reconnect) instead of relying on join-show.
 	socket.on('register-admin', () => {
 		socket.join('admin-room');
 	});
@@ -507,7 +506,6 @@ io.on('connection', (socket) => {
 		let tracks = [];
 
 		if (show && rawCue) {
-			// Find full cue object in database if incomplete
 			show.cueLists?.forEach((list) => {
 				const found = list.cues?.find((c) => c.id === rawCue.id);
 				if (found) {
@@ -519,7 +517,6 @@ io.on('connection', (socket) => {
 			show.activeCueId = fullCue.id;
 			saveDB(db, showId);
 
-			// Extract tracks using helper
 			tracks = buildCueTracks(show, fullCue);
 		} else if (rawCue && Array.isArray(rawCue.tracks)) {
 			tracks = rawCue.tracks;
