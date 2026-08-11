@@ -99,6 +99,7 @@
             color: #60a5fa;
             border: 1px solid rgba(37, 99, 235, 0.3);
             margin-bottom: 6px;
+            transition: all 0.2s ease;
         }
 
         .cue-header-main {
@@ -124,6 +125,65 @@
             height: 400px;
             z-index: 1;
             pointer-events: none;
+        }
+
+        /* --- LOADING INDICATOR --- */
+        #loading-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            background: rgba(17, 17, 24, 0.92);
+            border: 1px solid rgba(124, 58, 237, 0.4);
+            padding: 22px 32px;
+            border-radius: 18px;
+            backdrop-filter: blur(14px);
+            z-index: 100;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
+            pointer-events: auto;
+            min-width: 250px;
+            transition: opacity 0.2s ease;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(124, 58, 237, 0.2);
+            border-top-color: var(--accent-purple);
+            border-right-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        .loading-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .loading-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            transition: width 0.15s ease-out;
         }
 
         .orbit-avatar-wrapper {
@@ -413,6 +473,46 @@
             return `https://${src}`;
         }
 
+        function showLoadingUI(total) {
+            const stageContainer = document.getElementById('stage-container');
+            if (!stageContainer) return;
+            let loader = document.getElementById('loading-container');
+            if (!loader) {
+                loader = document.createElement('div');
+                loader.id = 'loading-container';
+                loader.innerHTML = `
+                    <div class="spinner"></div>
+                    <div class="loading-text" id="loading-text">Loading audio stems...</div>
+                    <div class="loading-progress-bar">
+                        <div class="loading-progress-fill" id="loading-bar-fill"></div>
+                    </div>
+                `;
+                stageContainer.appendChild(loader);
+            }
+            updateLoadingProgress(0, total);
+        }
+
+        function updateLoadingProgress(loaded, total) {
+            const textEl = document.getElementById('loading-text');
+            const fillEl = document.getElementById('loading-bar-fill');
+            const statusBadge = document.getElementById('show-status');
+
+            const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            
+            if (textEl) textEl.innerText = total > 0 ? `Loading audio stems (${loaded}/${total})...` : 'Loading audio...';
+            if (fillEl) fillEl.style.width = `${pct}%`;
+            
+            if (statusBadge && loaded < total) {
+                statusBadge.innerText = `⏳ Loading Audio (${loaded}/${total})...`;
+                statusBadge.style.color = "#fde047";
+            }
+        }
+
+        function hideLoadingUI() {
+            const loader = document.getElementById('loading-container');
+            if (loader) loader.remove();
+        }
+
         // ========================================================
         // SAMPLE-ACCURATE + iOS/ANDROID BACKGROUND COMPATIBLE ENGINE
         // ========================================================
@@ -554,7 +654,7 @@
                 await Promise.all(loadPromises);
             }
 
-            async playTracks(tracks, targetSeekTime = 0) {
+            async playTracks(tracks, targetSeekTime = 0, onProgress = null) {
                 await this.ensureContextRunning();
                 this.stopAll();
 
@@ -562,9 +662,16 @@
                 const currentSessionId = ++this.playSessionId;
                 const loadStartTime = performance.now();
 
-                const loadPromises = tracks.map(track => {
+                let loadedCount = 0;
+                const totalCount = tracks.length;
+                if (onProgress) onProgress(0, totalCount);
+
+                const loadPromises = tracks.map(async (track) => {
                     const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
-                    return this.preloadBuffer(src);
+                    const buf = await this.preloadBuffer(src);
+                    loadedCount++;
+                    if (onProgress) onProgress(loadedCount, totalCount);
+                    return buf;
                 });
                 await Promise.all(loadPromises);
 
@@ -840,6 +947,7 @@
 
         function handleShowStopped() {
             stemEngine.stopAll();
+            hideLoadingUI();
             currentTracksCache = [];
             document.getElementById('show-status').innerText = "Show Stopped";
             document.getElementById('show-status').style.color = "#94a3b8";
@@ -852,8 +960,8 @@
         }
 
         function playCue(activeCue, currentSeekTime) {
-            document.getElementById('show-status').innerText = "▶ Live Now";
-            document.getElementById('show-status').style.color = "#60a5fa";
+            document.getElementById('show-status').innerText = "⏳ Loading Audio...";
+            document.getElementById('show-status').style.color = "#fde047";
             document.getElementById('cue-title').innerText = activeCue.name;
 
             stemEngine.updateMediaSessionMetadata(activeCue.name, document.getElementById('show-title')?.innerText);
@@ -863,6 +971,10 @@
             stageContainer.innerHTML = ''; bottomConsole.innerHTML = '';
 
             currentTracksCache = activeCue.tracks || [];
+
+            if (currentTracksCache.length > 0) {
+                showLoadingUI(currentTracksCache.length);
+            }
 
             currentTracksCache.forEach((track) => {
                 if (volumeMemory[track.id] === undefined) volumeMemory[track.id] = 1.0;
@@ -902,7 +1014,14 @@
                 bottomConsole.appendChild(faderStrip);
             });
 
-            stemEngine.playTracks(currentTracksCache, currentSeekTime || 0);
+            stemEngine.playTracks(currentTracksCache, currentSeekTime || 0, (loaded, total) => {
+                updateLoadingProgress(loaded, total);
+                if (loaded >= total) {
+                    hideLoadingUI();
+                    document.getElementById('show-status').innerText = "▶ Live Now";
+                    document.getElementById('show-status').style.color = "#60a5fa";
+                }
+            });
         }
 
         window.handleVolumeChange = function (trackId, newVolume) {
