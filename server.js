@@ -1,6 +1,6 @@
 require('dotenv').config(); // Load environment variables
 const express = require('express');
-const http = require('http');
+const https = require('https'); // Swapped from 'http'
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
@@ -12,7 +12,15 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
 
 const app = express();
-const server = http.createServer(app);
+
+// --- HTTPS SSL CERTIFICATE CONFIGURATION ---
+// Place your key and cert files in the same directory as server.js (or update the paths/env variables)
+const sslOptions = {
+	key: fs.readFileSync(process.env.SSL_KEY_PATH || path.join(__dirname, 'key.pem')),
+	cert: fs.readFileSync(process.env.SSL_CERT_PATH || path.join(__dirname, 'cert.pem'))
+};
+
+const server = https.createServer(sslOptions, app);
 const io = new Server(server);
 
 const DB_PATH = path.join(__dirname, 'database.json');
@@ -537,7 +545,7 @@ io.on('connection', (socket) => {
 	});
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 443;
 server.listen(PORT, '0.0.0.0', () =>
-	console.log(`🚀 Server running on http://localhost:${PORT}`)
+	console.log(`🔒 Secure HTTPS Server running on https://localhost:${PORT}`)
 );

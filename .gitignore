@@ -2,6 +2,8 @@ public/uploads/
 database.json
 show-data.json
 
+ssl/
+
 # Logs
 logs
 *.log
