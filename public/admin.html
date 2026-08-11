@@ -1571,7 +1571,7 @@
         }
 
         function renderBandLabModalStep1() {
-            const { show, cue } = currentBandLabContext;
+            const { show } = currentBandLabContext;
             const content = document.getElementById('bandlab-modal-content');
 
             const castOptions = show.casts.map(c =>
@@ -1586,47 +1586,13 @@
         </div>
 
         <div class="panel" style="margin-top: 15px;">
-            <h4>2. Option A: Paste BandLab Link</h4>
-            <div style="display:flex; gap:10px; margin-top:8px;">
-                <input type="text" id="bl-link-input" placeholder="https://www.bandlab.com/join/fj9xamu" style="flex:1;">
-                <button class="btn-sm" style="background:var(--accent); width:auto;" onclick="handleBandLabLinkSubmit()">Import Link</button>
-            </div>
-        </div>
-
-        <div class="panel" style="margin-top: 15px;">
-            <h4>Option B: Select / Drop Exported Stem Files</h4>
+            <h4>2. Select / Drop Exported BandLab Stem Files</h4>
+            <p><small style="color:#a1a1aa;">Choose multiple exported WAV or MP3 audio files from your BandLab project folder.</small></p>
             <input type="file" id="bl-files-input" multiple accept="audio/*" onchange="processSelectedBandLabFiles(this.files)" style="margin-top:8px;">
         </div>
 
         <div id="bl-mapping-container" style="margin-top: 15px;"></div>
     `;
-        }
-
-        async function handleBandLabLinkSubmit() {
-            const linkInput = document.getElementById('bl-link-input')?.value?.trim();
-            if (!linkInput) return alert("Please enter a valid BandLab link.");
-
-            const mappingContainer = document.getElementById('bl-mapping-container');
-            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Resolving BandLab link metadata...</p>`;
-
-            try {
-                const response = await fetch('/api/bandlab/fetch-link', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: linkInput })
-                });
-                const result = await response.json();
-
-                if (!result.success) {
-                    mappingContainer.innerHTML = `
-                <div class="panel" style="border-left:4px solid var(--standby); background:#451a03; color:#fde68a;">
-                    ⚠️ ${result.message}
-                </div>
-            `;
-                }
-            } catch (err) {
-                alert("Failed to resolve link: " + err.message);
-            }
         }
 
         async function processSelectedBandLabFiles(fileList) {

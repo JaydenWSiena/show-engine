@@ -471,35 +471,6 @@ app.put('/api/shows/:showId/active', (req, res) => {
 	saveDB(db, req.params.showId);
 	res.json(show);
 });
-// FETCH / RESOLVE BANDLAB PROJECT LINK
-app.post('/api/bandlab/fetch-link', async (req, res) => {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: 'URL is required' });
-
-    try {
-        // Fetch public metadata or embedded state from BandLab link
-        const response = await fetch(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        const html = await response.text();
-
-        // BandLab embeds state in initial window script
-        const match = html.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});/s) || 
-                      html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
-
-        if (match) {
-            const data = JSON.parse(match[1]);
-            return res.json({ success: true, data });
-        }
-
-        res.json({ 
-            success: false, 
-            message: 'BandLab invite links require authentication or direct file exports. Use BandLab "Download > Tracks" to drag & drop exported stems directly below.' 
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // BATCH IMPORT STEMS & INSTRUMENTAL TO CUE
 app.post('/api/shows/:showId/cuelists/:listId/cues/:cueId/batch-import', (req, res) => {
