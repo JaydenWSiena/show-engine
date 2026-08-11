@@ -828,7 +828,6 @@
             await loadDatabase();
         }
 
-        // 2. Lock in activeCueDuration when GO is triggered
         function triggerGo() {
             const show = getSelectedShowById(activeShowId);
             if (!show) return alert("❌ No show selected!");
@@ -845,7 +844,6 @@
             playbackStartTime = Date.now();
             selectedSeekTime = 0;
 
-            // Lock active track duration to current selection on GO
             activeCueDuration = playbackDuration;
 
             startPlayheadTimer();
@@ -877,7 +875,7 @@
                 playbackCurrentTime = Math.min(playbackDuration, Math.max(0, elapsed));
             }
         }
-        // 3. Check timer completion against activeCueDuration instead of playbackDuration
+
         function startPlayheadTimer() {
             stopPlayheadTimer();
             playheadInterval = setInterval(() => {
@@ -885,7 +883,6 @@
                     syncPlayheadFromTimestamp();
                     drawWaveformScrubber();
 
-                    // Auto-stop only when the active track finishes
                     if (activeCueDuration > 0 && playbackCurrentTime >= activeCueDuration) {
                         triggerStop();
                     }
@@ -897,7 +894,6 @@
             if (playheadInterval) clearInterval(playheadInterval);
         }
 
-        // 4. Update selected cue metadata without disrupting the playing track
         function updateSelectedCueDuration() {
             const show = getSelectedShowById(activeShowId);
             if (!show) return;
@@ -925,7 +921,6 @@
                     if (tempAudio.duration && !isNaN(tempAudio.duration)) {
                         playbackDuration = tempAudio.duration;
 
-                        // Only update activeCueDuration if inspecting the active cue
                         if (liveState.activeCueIndex === liveState.standbyCueIndex) {
                             activeCueDuration = tempAudio.duration;
                         }
@@ -968,7 +963,6 @@
             return tracks;
         }
 
-        // 1. Cache duration along with audio peaks[cite: 1]
         async function loadAudioPeaks(url, samples = 200) {
             if (!url) return null;
             if (waveformCache.has(url)) return waveformCache.get(url);
@@ -1001,7 +995,6 @@
                     for (let i = 0; i < samples; i++) peaks[i] = peaks[i] / max;
                 }
 
-                // Cache both peaks and actual track duration[cite: 1]
                 const data = { peaks, duration: audioBuffer.duration };
                 waveformCache.set(url, data);
                 drawWaveformScrubber();
@@ -1013,7 +1006,6 @@
             }
         }
 
-        // 2. Proportional track width rendering in drawWaveformScrubber()[cite: 1]
         function drawWaveformScrubber() {
             const canvas = document.getElementById('waveform-canvas');
             if (!canvas) return;
@@ -1067,7 +1059,6 @@
                     const peaks = cachedData.peaks;
                     const trackDuration = cachedData.duration || playbackDuration;
 
-                    // Calculate track rendering width relative to total playback duration[cite: 1]
                     const trackWidth = Math.min(width, (trackDuration / playbackDuration) * width);
                     const barWidth = trackWidth / numBars;
 
@@ -1090,7 +1081,7 @@
 
             ctx.globalAlpha = 1.0;
 
-            // Draw Seek Target Marker[cite: 1]
+            // Draw Seek Target Marker
             if (selectedSeekTime > 0) {
                 const targetX = (selectedSeekTime / playbackDuration) * width;
                 ctx.strokeStyle = '#eab308';
@@ -1108,7 +1099,7 @@
                 ctx.textAlign = 'left';
             }
 
-            // Draw Playhead Marker[cite: 1]
+            // Draw Playhead Marker
             const isSelectedSongPlaying = liveState.isPlaying && (liveState.activeCueIndex === liveState.standbyCueIndex);
 
             if (isSelectedSongPlaying) {
@@ -1128,28 +1119,6 @@
             document.getElementById('selected-time-display').innerText = formatTime(selectedSeekTime);
         }
 
-
-        // Draw Playhead Marker
-        const isSelectedSongPlaying = liveState.isPlaying && (liveState.activeCueIndex === liveState.standbyCueIndex);
-
-        if (isSelectedSongPlaying) {
-            const playheadX = (playbackCurrentTime / playbackDuration) * width;
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 3 * window.devicePixelRatio;
-            ctx.beginPath(); ctx.moveTo(playheadX, 0); ctx.lineTo(playheadX, height); ctx.stroke();
-
-            ctx.fillStyle = '#3b82f6';
-            ctx.beginPath();
-            ctx.arc(playheadX, 6 * window.devicePixelRatio, 6 * window.devicePixelRatio, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Update UI displays
-        document.getElementById('current-time-display').innerText = isSelectedSongPlaying ? formatTime(playbackCurrentTime) : '00:00.0';
-        document.getElementById('total-time-display').innerText = formatTime(playbackDuration);
-        document.getElementById('selected-time-display').innerText = formatTime(selectedSeekTime);
-
-
         function handleWaveformClick(e) {
             if (audioContext.state === 'suspended') audioContext.resume();
 
@@ -1160,6 +1129,7 @@
             selectedSeekTime = ratio * playbackDuration;
             drawWaveformScrubber();
         }
+
         function skipToSelectedPosition() {
             if (selectedSeekTime <= 0) return alert("💡 Click a position on the waveform scrubber first!");
 
@@ -1168,18 +1138,15 @@
             const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
             const sortedCues = getSortedCues(cueList?.cues);
 
-            // Check if we are selecting a new/different track or if playback is stopped
             const isDifferentTrack = liveState.standbyCueIndex !== liveState.activeCueIndex;
 
             if (isDifferentTrack || !liveState.isPlaying) {
-                // Switch active track to selected standby cue
                 liveState.activeCueIndex = liveState.standbyCueIndex;
                 liveState.isPlaying = true;
                 activeCueDuration = playbackDuration;
 
                 const targetCue = sortedCues[liveState.activeCueIndex];
                 if (targetCue) {
-                    // Trigger the new cue stream across all connected viewers
                     socket.emit('trigger-cue', {
                         showId: activeShowId,
                         cue: targetCue,
@@ -1188,7 +1155,6 @@
                 }
             }
 
-            // Set the playhead clock to the target seek position
             playbackCurrentTime = selectedSeekTime;
             playbackStartTime = Date.now() - (selectedSeekTime * 1000);
 
@@ -1196,7 +1162,6 @@
             renderLiveTable();
             drawWaveformScrubber();
 
-            // Send seek command so viewers seek directly to the timestamp
             socket.emit('seek-cue', {
                 showId: activeShowId,
                 position: selectedSeekTime
