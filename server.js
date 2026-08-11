@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const ffmpeg = require('fluent-ffmpeg');
 
 // Add S3 and Multer-S3 imports
 const { S3Client } = require('@aws-sdk/client-s3');
