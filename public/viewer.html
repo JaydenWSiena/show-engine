@@ -201,7 +201,7 @@
             z-index: 3;
         }
 
-        /* --- BOTTOM CONSOLE (WITH BOOST OPTION) --- */
+        /* --- BOTTOM CONSOLE --- */
         #bottom-console {
             position: relative;
             z-index: 10;
@@ -255,7 +255,6 @@
             text-overflow: ellipsis;
         }
 
-        /* Boost Toggle Button */
         .btn-boost {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -280,7 +279,6 @@
             box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
         }
 
-        /* Wider VU Level Bar */
         .vu-meter {
             width: 100%;
             height: 12px;
@@ -304,7 +302,6 @@
             background: linear-gradient(to right, #1e3a8a 0%, #2563eb 40%, #f97316 80%, #ef4444 100%);
         }
 
-        /* 16th Notch Steps Slider */
         .slider-notch-wrapper {
             position: relative;
             width: 100%;
@@ -365,6 +362,9 @@
 
     <canvas id="visualizer-canvas"></canvas>
 
+    <!-- Hidden HTML5 audio tag used to anchor iOS background media playback session -->
+    <audio id="ios-background-audio" playsinline style="display:none;"></audio>
+
     <div id="unlock-overlay">
         <h2 style="margin-bottom: 20px;">Ready for the show?</h2>
         <button class="btn-unlock" onclick="unlockAudio()">Join Audio Stream</button>
@@ -395,8 +395,7 @@
         let volumeMemory = {};
         let boostMemory = {};
 
-        // --- CLOCK SYNC STATE ---
-        let serverClockOffset = 0; // (serverTime - localTime) in ms
+        let serverClockOffset = 0;
 
         const canvas = document.getElementById('visualizer-canvas');
         const canvasCtx = canvas.getContext('2d');
@@ -405,7 +404,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const showId = urlParams.get('show') || 'main-show';
 
-        // Helper to format/ensure full HTTPS URL for fetching audio
         function getFullUrl(src) {
             if (!src) return '';
             if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
@@ -415,17 +413,18 @@
         }
 
         // ========================================================
-        // SAMPLE-ACCURATE BULLETPROOF STEM AUDIO ENGINE
+        // SAMPLE-ACCURATE + iOS BACKGROUND COMPATIBLE ENGINE
         // ========================================================
         class BulletproofStemEngine {
             constructor() {
                 this.audioCtx = null;
                 this.masterAnalyser = null;
                 this.masterGain = null;
-                this.stemBuffers = new Map(); // src -> AudioBuffer
-                this.activeInstances = [];   // [{ id, source, gainNode, analyser, levelEl }]
+                this.streamDest = null;
+                this.iosAudioEl = null;
+                this.stemBuffers = new Map();
+                this.activeInstances = [];
                 this.startTime = 0;
-                this.seekOffset = 0;
                 this.isPlaying = false;
             }
 
@@ -434,36 +433,74 @@
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
                         latencyHint: 'interactive'
                     });
+
                     this.masterAnalyser = this.audioCtx.createAnalyser();
                     this.masterAnalyser.fftSize = 256;
 
                     this.masterGain = this.audioCtx.createGain();
                     this.masterGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
 
+                    // Connect chain: Stems -> Master Analyser -> Master Gain
                     this.masterAnalyser.connect(this.masterGain);
+
+                    // Direct Web Audio output
                     this.masterGain.connect(this.audioCtx.destination);
+
+                    // iOS BACKGROUND PLAYBACK BRIDGE:
+                    // Pipe Web Audio output into a MediaStream Destination -> HTML5 Audio Element
+                    if (this.audioCtx.createMediaStreamDestination) {
+                        this.streamDest = this.audioCtx.createMediaStreamDestination();
+                        this.masterGain.connect(this.streamDest);
+
+                        this.iosAudioEl = document.getElementById('ios-background-audio');
+                        if (this.iosAudioEl) {
+                            this.iosAudioEl.srcObject = this.streamDest.stream;
+                        }
+                    }
                 }
+
                 if (this.audioCtx.state === 'suspended') {
                     this.audioCtx.resume();
+                }
+
+                if (this.iosAudioEl && this.iosAudioEl.paused) {
+                    this.iosAudioEl.play().catch(e => console.log('iOS Audio Playback triggered:', e));
+                }
+
+                this.setupMediaSession();
+            }
+
+            setupMediaSession() {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: document.getElementById('cue-title')?.innerText || "Live Performance",
+                        artist: document.getElementById('show-title')?.innerText || "Live Show",
+                        album: "Multitrack Live Stream"
+                    });
+
+                    navigator.mediaSession.setActionHandler('play', () => {
+                        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                            this.audioCtx.resume();
+                        }
+                        if (this.iosAudioEl) this.iosAudioEl.play();
+                    });
+
+                    navigator.mediaSession.setActionHandler('pause', () => {
+                        // Keep audio active for live shows or handle pause
+                    });
                 }
             }
 
             async preloadBuffer(src) {
                 if (!src) return null;
                 const fullUrl = getFullUrl(src);
-
                 if (this.stemBuffers.has(fullUrl)) return this.stemBuffers.get(fullUrl);
-                if (this.stemBuffers.has(src)) return this.stemBuffers.get(src);
 
                 try {
                     const res = await fetch(fullUrl);
-                    if (!res.ok) {
-                        throw new Error(`HTTP ${res.status} when fetching stem: ${fullUrl}`);
-                    }
                     const arrayBuffer = await res.arrayBuffer();
                     const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
                     this.stemBuffers.set(fullUrl, audioBuffer);
-                    this.stemBuffers.set(src, audioBuffer);
                     return audioBuffer;
                 } catch (err) {
                     console.error(`❌ Failed to decode audio stem (${fullUrl}):`, err);
@@ -471,7 +508,6 @@
                 }
             }
 
-            // Preload all stems across all cues in the background
             async preloadAllStems(tracks) {
                 if (!tracks || !Array.isArray(tracks)) return;
                 this.initContext();
@@ -480,7 +516,6 @@
                     return this.preloadBuffer(src);
                 });
                 await Promise.all(loadPromises);
-                console.log(`✅ Preloaded show stems into RAM.`);
             }
 
             async playTracks(tracks, targetSeekTime = 0) {
@@ -488,33 +523,29 @@
                 this.stopAll();
 
                 this.isPlaying = true;
-
-                // Mark timestamp before decoding local buffers
                 const loadStartTime = performance.now();
 
-                // Concurrent preload/fetch (instantaneous if preloaded)
                 const loadPromises = tracks.map(track => {
                     const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
                     return this.preloadBuffer(src);
                 });
                 await Promise.all(loadPromises);
 
-                if (!this.isPlaying) return; // Stopped while downloading
+                if (!this.isPlaying) return;
 
-                // Account for time spent decoding local buffers
                 const loadDuration = (performance.now() - loadStartTime) / 1000;
                 const adjustedSeekTime = targetSeekTime + loadDuration;
 
-                // Schedule ALL audio sources on exact sample tick (+100ms hardware offset)
-                const scheduledStartTime = this.audioCtx.currentTime + 0.100;
+                // Schedule all stems to trigger on the EXACT same audio clock sample
+                const scheduledStartTime = this.audioCtx.currentTime + 0.300;
                 this.startTime = scheduledStartTime - adjustedSeekTime;
 
                 tracks.forEach((track) => {
-                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
-                    const buffer = this.stemBuffers.get(src) || this.stemBuffers.get(getFullUrl(src));
+                    const rawSrc = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
+                    const fullUrl = getFullUrl(rawSrc);
+                    const buffer = this.stemBuffers.get(fullUrl);
                     if (!buffer) return;
 
-                    // Skip if seek position exceeds track length
                     if (adjustedSeekTime >= buffer.duration) return;
 
                     const source = this.audioCtx.createBufferSource();
@@ -530,23 +561,25 @@
 
                     gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
 
-                    // Chain: Source -> GainNode -> Track Analyser -> Master Analyser
                     source.connect(gainNode);
                     gainNode.connect(trackAnalyser);
                     trackAnalyser.connect(this.masterAnalyser);
 
-                    // Trigger hardware-accurate scheduled playback
                     source.start(scheduledStartTime, adjustedSeekTime);
 
                     this.activeInstances.push({
                         id: track.id,
-                        src: src,
+                        src: rawSrc,
                         source: source,
                         gainNode: gainNode,
                         analyser: trackAnalyser,
                         levelEl: document.getElementById(`level-${track.id}`)
                     });
                 });
+
+                if (this.iosAudioEl && this.iosAudioEl.paused) {
+                    this.iosAudioEl.play().catch(() => {});
+                }
             }
 
             updateVolume(trackId, volFloat, isBoosted) {
@@ -591,9 +624,7 @@
 
         const stemEngine = new BulletproofStemEngine();
 
-        // ========================================================
-        // SERVER CLOCK SYNC & LATENCY COMPENSATION
-        // ========================================================
+        // --- CLOCK SYNC ---
         function syncClock() {
             const clientSendTime = Date.now();
             socket.emit('clock-sync', { clientSendTime });
@@ -602,22 +633,18 @@
         socket.on('clock-sync-response', (data) => {
             if (!data || !data.clientSendTime || !data.serverTime) return;
             const now = Date.now();
-            const rtt = now - data.clientSendTime; // Round Trip Time
+            const rtt = now - data.clientSendTime;
             const estimatedServerTimeNow = data.serverTime + (rtt / 2);
             serverClockOffset = estimatedServerTimeNow - now;
         });
 
-        // Sync clock immediately on socket connection & refresh every 10s
-        socket.on('connect', () => {
-            syncClock();
-        });
+        socket.on('connect', () => { syncClock(); });
         setInterval(syncClock, 10000);
 
         function getCalibratedServerTime() {
             return Date.now() + serverClockOffset;
         }
 
-        // Canvas visualizer particle initialization
         function initNeurons() {
             neurons = []; pulses = [];
             const numNeurons = Math.floor((canvas.width * canvas.height) / 18000);
@@ -667,7 +694,13 @@
             }
         }
 
-        // --- SOCKET HANDLERS ---
+        // Keep Audio Context alive when app is un-minimized on iOS
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && stemEngine.audioCtx && stemEngine.audioCtx.state === 'suspended') {
+                stemEngine.audioCtx.resume();
+            }
+        });
+
         socket.emit('join-show', { showId: showId });
 
         socket.on('database-updated', (db) => {
@@ -692,7 +725,6 @@
                 titleEl.innerText = currentShow.title;
             }
 
-            // Preload all stems across all cues in background
             if (currentShow && currentShow.cueLists) {
                 const allUrls = [];
                 currentShow.cueLists.forEach(list => {
@@ -726,7 +758,6 @@
         function calculateAndPlayCue(state) {
             let livePosition = state.currentSeekTime || 0;
 
-            // Apply Server Clock Skew & Network Transit Compensation
             if (state.serverTimestamp) {
                 const currentCalibratedServerTime = getCalibratedServerTime();
                 const transitTimeSec = Math.max(0, (currentCalibratedServerTime - state.serverTimestamp) / 1000);
@@ -776,7 +807,6 @@
                 const currentVolume = volumeMemory[track.id];
                 const isBoosted = boostMemory[track.id];
 
-                // Orbit Avatar DOM Element
                 const avatarWrapper = document.createElement('div');
                 avatarWrapper.className = 'orbit-avatar-wrapper';
                 avatarWrapper.id = `orbit-wrapper-${track.id}`;
@@ -788,7 +818,6 @@
                 `;
                 stageContainer.appendChild(avatarWrapper);
 
-                // Fader Strip with Boost Button DOM Element
                 const faderStrip = document.createElement('div');
                 faderStrip.className = `fader-strip ${isBoosted ? 'boosted' : ''}`;
                 faderStrip.id = `strip-${track.id}`;
@@ -809,11 +838,9 @@
                 bottomConsole.appendChild(faderStrip);
             });
 
-            // Start synchronized stem engine playback
             stemEngine.playTracks(currentTracksCache, currentSeekTime || 0);
         }
 
-        // --- VOLUME & BOOST HANDLERS ---
         window.handleVolumeChange = function (trackId, newVolume) {
             const volFloat = parseFloat(newVolume);
             volumeMemory[trackId] = volFloat;
@@ -835,7 +862,6 @@
             stemEngine.updateVolume(trackId, currentVol, isBoosted);
         }
 
-        // --- VISUALIZER DRAW LOOP ---
         function drawAbstractVisualizer() {
             requestAnimationFrame(drawAbstractVisualizer);
             if (!stemEngine.masterAnalyser) return;
