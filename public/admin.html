@@ -431,6 +431,62 @@
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const waveformCache = new Map(); // url -> Float32Array of peak amplitudes
 
+        // Helper function to extract and normalize character stems into a flat array
+        function extractTracksFromCue(cue, activeCastId, showCharacters = []) {
+            if (!cue) return [];
+            let tracks = [];
+
+            // 1. Add Instrumental Track if present
+            if (cue.instrumentalUrl) {
+                tracks.push({
+                    id: 'instrumental',
+                    name: cue.instrumentalName || 'Instrumental',
+                    src: cue.instrumentalUrl,
+                    audioUrl: cue.instrumentalUrl,
+                    avatar: cue.instrumentalAvatar || ''
+                });
+            }
+
+            // 2. Parse Cast Stems (Handles Objects, Arrays, and Maps)
+            if (cue.castStems) {
+                let rawStems = [];
+
+                if (activeCastId && cue.castStems[activeCastId]) {
+                    const castGroup = cue.castStems[activeCastId];
+                    rawStems = Array.isArray(castGroup) ? castGroup : Object.values(castGroup);
+                } else if (Array.isArray(cue.castStems)) {
+                    rawStems = cue.castStems;
+                } else {
+                    Object.values(cue.castStems).forEach(group => {
+                        const items = Array.isArray(group) ? group : [group];
+                        rawStems.push(...items);
+                    });
+                }
+
+                rawStems.forEach((stem, idx) => {
+                    const audioUrl = stem.audioUrl || stem.url || stem.src;
+                    if (audioUrl) {
+                        const charDef = showCharacters.find(c => c.id === stem.characterId);
+                        tracks.push({
+                            id: stem.id || stem.characterId || `stem-${idx}`,
+                            characterId: stem.characterId,
+                            name: stem.name || charDef?.name || `Character Voice ${idx + 1}`,
+                            src: audioUrl,
+                            audioUrl: audioUrl,
+                            avatar: stem.avatar || ''
+                        });
+                    }
+                });
+            }
+
+            // 3. Fallback to cue.tracks if pre-flattened
+            if (tracks.length === 0 && cue.tracks && Array.isArray(cue.tracks)) {
+                tracks = cue.tracks;
+            }
+
+            return tracks;
+        }
+
         function getSortedCues(cues) {
             if (!cues || !Array.isArray(cues)) return [];
             return [...cues].sort((a, b) =>
@@ -765,7 +821,8 @@
           </div>
 
           ${show.casts.map(cast => {
-                const stems = (cue.castStems && cue.castStems[cast.id]) ? cue.castStems[cast.id] : [];
+                const castStemsRaw = cue.castStems ? cue.castStems[cast.id] : [];
+                const stems = Array.isArray(castStemsRaw) ? castStemsRaw : (castStemsRaw ? Object.values(castStemsRaw) : []);
                 return `
               <div class="panel">
                 <h4>🎤 Vocal Stems for: ${cast.name}</h4>
@@ -848,7 +905,12 @@
 
             startPlayheadTimer();
 
-            socket.emit('trigger-cue', { showId: activeShowId, cue: sortedCues[cueIndex], index: cueIndex });
+            const rawCue = sortedCues[cueIndex];
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const tracks = extractTracksFromCue(rawCue, activeCastId, show.characters || []);
+            const cuePayload = { ...rawCue, tracks };
+
+            socket.emit('trigger-cue', { showId: activeShowId, cue: cuePayload, index: cueIndex });
             renderLiveTable();
             drawWaveformScrubber();
         }
@@ -903,12 +965,9 @@
 
             if (!cue) return;
 
-            let audioUrl = cue.instrumentalUrl || null;
-            if (!audioUrl) {
-                const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
-                const stems = (cue.castStems && cue.castStems[activeCastId]) ? cue.castStems[activeCastId] : [];
-                if (stems.length > 0 && stems[0].audioUrl) audioUrl = stems[0].audioUrl;
-            }
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const tracks = extractTracksFromCue(cue, activeCastId, show.characters || []);
+            let audioUrl = tracks.length > 0 ? tracks[0].audioUrl : null;
 
             if (audioUrl) {
                 if (currentMetadataAudio) {
@@ -943,24 +1002,15 @@
             const cue = sortedCues[liveState.standbyCueIndex];
             if (!cue) return [];
 
-            const tracks = [];
-            if (cue.instrumentalUrl) {
-                tracks.push({ name: 'Instrumental', color: '#3b82f6', url: cue.instrumentalUrl });
-            }
-
             const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
-            const stems = (cue.castStems && cue.castStems[activeCastId]) ? cue.castStems[activeCastId] : [];
-            stems.forEach((s, idx) => {
-                const charDef = show.characters.find(c => c.id === s.characterId);
-                const colors = ['#16a34a', '#eab308', '#ec4899', '#8b5cf6', '#06b6d4'];
-                tracks.push({
-                    name: charDef?.name || `Stem ${idx + 1}`,
-                    color: colors[idx % colors.length],
-                    url: s.audioUrl
-                });
-            });
+            const extracted = extractTracksFromCue(cue, activeCastId, show.characters || []);
+            const colors = ['#3b82f6', '#16a34a', '#eab308', '#ec4899', '#8b5cf6', '#06b6d4'];
 
-            return tracks;
+            return extracted.map((t, idx) => ({
+                name: t.name,
+                color: t.id === 'instrumental' ? '#3b82f6' : colors[idx % colors.length],
+                url: t.audioUrl || t.src
+            }));
         }
 
         async function loadAudioPeaks(url, samples = 200) {
@@ -1156,9 +1206,13 @@
 
                 const targetCue = sortedCues[liveState.activeCueIndex];
                 if (targetCue) {
+                    const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+                    const tracks = extractTracksFromCue(targetCue, activeCastId, show.characters || []);
+                    const cuePayload = { ...targetCue, tracks };
+
                     socket.emit('trigger-cue', {
                         showId: activeShowId,
-                        cue: targetCue,
+                        cue: cuePayload,
                         index: liveState.activeCueIndex
                     });
                 }
