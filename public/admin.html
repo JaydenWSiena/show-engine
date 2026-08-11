@@ -204,13 +204,20 @@
             margin-bottom: 8px;
         }
 
+        /* FIXED AVATAR PREVIEW CSS */
         .avatar-preview {
             width: 36px;
             height: 36px;
+            min-width: 36px;
+            min-height: 36px;
+            max-width: 36px;
+            max-height: 36px;
             border-radius: 50%;
             object-fit: cover;
             background: #27272a;
             border: 1px solid var(--border);
+            flex-shrink: 0;
+            display: inline-block;
         }
 
         .hidden {
@@ -275,7 +282,6 @@
             gap: 4px;
         }
 
-        /* UPLOAD PROGRESS BAR OVERLAY STYLES */
         #upload-progress-container {
             position: fixed;
             bottom: 24px;
@@ -311,9 +317,8 @@
 
 <body>
 
-    <!-- FLOATING UPLOAD PROGRESS DIALOG -->
     <div id="upload-progress-container">
-        <div style="display:flex; justify-space-between; align-items:center;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
             <strong id="upload-filename" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; color: #f4f4f5;">Uploading...</strong>
             <span id="upload-percent" style="font-size: 13px; color: var(--accent); font-weight: bold;">0%</span>
         </div>
@@ -367,7 +372,6 @@
                 <button class="btn-stop" onclick="triggerStop()">STOP [ESC]</button>
             </div>
 
-            <!-- CUE WAVEFORM SCRUBBER PANEL -->
             <div class="card">
                 <div class="header-row" style="margin-bottom: 5px;">
                     <h3>🎛 Active Cue Audio Waveform Scrubber</h3>
@@ -496,8 +500,8 @@
         let activeShowId = null;
         let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false };
 
-        // DEFAULT DARK-THEME VECTOR AVATAR (data URL)
-        const DEFAULT_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2327272a" stroke="%23a1a1aa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        // SAFE BASE64 DARK-MODE VECTOR AVATAR DATA-URI (NO QUOTE/STRING ESCAPING ISSUES)
+        const DEFAULT_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI3MjcyYSIgc3Ryb2tlPSIjYTFhMWFhIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCIvPjwvc3ZnPg==";
 
         let dirtyTabs = { 'tab-live': false, 'tab-shows': false, 'tab-cues': false };
         function getActiveTabId() {
@@ -511,7 +515,6 @@
             dirtyTabs[tabId] = false;
         }
 
-        // Scrubber & Clock Sync
         let playbackCurrentTime = 0;
         let playbackDuration = 180;
         let activeCueDuration = 180;
@@ -520,7 +523,6 @@
         let playheadInterval = null;
         let currentMetadataAudio = null;
 
-        // Real Audio Waveform Engine
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const waveformCache = new Map();
         const durationCache = new Map();
@@ -683,7 +685,6 @@
             }
         }
 
-        // UPLOAD HELPERS & SMOOTH PROGRESS CONTROLLER
         function showUploadProgress(filename) {
             const container = document.getElementById('upload-progress-container');
             document.getElementById('upload-filename').innerText = `Uploading ${filename}...`;
@@ -1001,7 +1002,7 @@
                     return `
                     <div class="flex-row" style="background:#27272a; padding:8px; border-radius:4px; justify-content:space-between;">
                       <div class="flex-row" style="margin:0;">
-                        <img src="${member?.avatarUrl || DEFAULT_AVATAR}" onerror="this.src='${DEFAULT_AVATAR}'" class="avatar-preview" style="width:30px; height:30px;">
+                        <img src="${member?.avatarUrl || DEFAULT_AVATAR}" onerror="this.src='${DEFAULT_AVATAR}'" class="avatar-preview" style="width:30px; height:30px; min-width:30px; min-height:30px;">
                         <strong>${charDef?.name || 'Role'}</strong>
                         <span style="color:#a1a1aa;">(${member?.actor || 'No Actor Set'})</span>
                       </div>
@@ -1202,7 +1203,7 @@
                 const response = await fetch(fullUrl);
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: Failed to fetch audio file from DigitalOcean.`);
+                    throw new Error(`HTTP ${response.status}: Failed to fetch audio file.`);
                 }
 
                 const arrayBuffer = await response.arrayBuffer();
