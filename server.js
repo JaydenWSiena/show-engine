@@ -7,7 +7,7 @@ const path = require('path');
 const multer = require('multer');
 const ffmpeg = require('fluent-ffmpeg');
 
-// Add S3 and Multer-S3 imports
+// S3 and Multer-S3 imports
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
 
@@ -32,17 +32,16 @@ const upload = multer({ dest: 'uploads_temp/' });
 
 // Helper function to convert audio using FFmpeg
 function convertAudio(inputPath, outputPath) {
-    return new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            // Fix encoding parameters:
-            .audioCodec('pcm_s16le') // 16-bit PCM WAV (or use 'libmp3lame' for MP3)
-            .audioFrequency(44100)   // 44.1kHz sample rate
-            .audioChannels(2)        // Stereo
-            .format('wav')           // Force WAV container
-            .on('end', () => resolve(outputPath))
-            .on('error', (err) => reject(err))
-            .save(outputPath);
-    });
+	return new Promise((resolve, reject) => {
+		ffmpeg(inputPath)
+			.audioCodec('pcm_s16le') // 16-bit PCM WAV
+			.audioFrequency(44100)   // 44.1kHz sample rate
+			.audioChannels(2)        // Stereo
+			.format('wav')           // Force WAV container
+			.on('end', () => resolve(outputPath))
+			.on('error', (err) => reject(err))
+			.save(outputPath);
+	});
 }
 
 app.use(express.json());
@@ -73,55 +72,101 @@ function saveDB(db) {
 	}
 }
 
+// Helper function to construct structured viewer tracks array from database cues
+function buildCueTracks(show, cue) {
+	if (!cue) return [];
+	let tracks = [];
+
+	// 1. Add Instrumental
+	if (cue.instrumentalUrl) {
+		tracks.push({
+			id: 'inst-' + (cue.id || 'main'),
+			name: '🎵 Instrumental',
+			src: cue.instrumentalUrl,
+			avatar: '',
+		});
+	}
+
+	// 2. Add Character Stems
+	const activeCastId = show?.activeCastId || 'cast-main';
+	const activeCast = show?.casts?.find((c) => c.id === activeCastId);
+
+	let stems = [];
+	if (cue.castStems && cue.castStems[activeCastId]) {
+		stems = cue.castStems[activeCastId];
+	} else if (cue.castStems) {
+		// Fallback: search across all cast stems if specific active cast list is missing
+		Object.values(cue.castStems).forEach((stemArray) => {
+			if (Array.isArray(stemArray)) stems.push(...stemArray);
+		});
+	}
+
+	stems.forEach((stem, idx) => {
+		if (!stem.audioUrl) return; // Skip invalid entries
+
+		const charDef = show?.characters?.find((c) => c.id === stem.characterId);
+		const memberInfo = activeCast?.members
+			? activeCast.members[stem.characterId]
+			: null;
+
+		const charName = charDef ? charDef.name : 'Role';
+		const actorName = memberInfo?.actor ? ` (${memberInfo.actor})` : '';
+		const avatarUrl = memberInfo?.avatarUrl || '';
+
+		tracks.push({
+			id: `stem-${stem.characterId || idx}-${idx}`,
+			name: `${charName}${actorName}`,
+			src: stem.audioUrl,
+			avatar: avatarUrl,
+		});
+	});
+
+	return tracks;
+}
+
 // --- REST API ---
 
 app.get('/api/database', (req, res) => res.json(readDB()));
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
+	if (!req.file) {
+		return res.status(400).json({ error: 'No file uploaded' });
+	}
 
-    const tempInputPath = req.file.path;
-    const tempOutputPath = path.join('uploads_temp', `converted-${Date.now()}.wav`);
+	const tempInputPath = req.file.path;
+	const tempOutputPath = path.join('uploads_temp', `converted-${Date.now()}.wav`);
 
-    try {
-        // 1. Convert audio to standard 16-bit PCM WAV
-        console.log(`⏳ Converting ${req.file.originalname}...`);
-        await convertAudio(tempInputPath, tempOutputPath);
+	try {
+		console.log(`⏳ Converting ${req.file.originalname}...`);
+		await convertAudio(tempInputPath, tempOutputPath);
 
-        // 2. Read the converted file into a buffer
-        const fileStream = fs.readFileSync(tempOutputPath);
-        const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
+		const fileStream = fs.readFileSync(tempOutputPath);
+		const fileKey = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
 
-        // 3. Upload converted file to DigitalOcean Spaces
-        const uploadParams = {
-            Bucket: process.env.DO_SPACES_BUCKET,
-            Key: fileKey,
-            Body: fileStream,
-            ACL: 'public-read', // Ensures browser can fetch the binary audio stream
-            ContentType: 'audio/wav',
-        };
+		const uploadParams = {
+			Bucket: process.env.DO_SPACES_BUCKET,
+			Key: fileKey,
+			Body: fileStream,
+			ACL: 'public-read',
+			ContentType: 'audio/wav',
+		};
 
-        await s3Client.send(new PutObjectCommand(uploadParams));
+		await s3Client.send(new PutObjectCommand(uploadParams));
 
-        // Construct full HTTPS public URL
-        const fileUrl = `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com/${fileKey}`;
+		const fileUrl = `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com/${fileKey}`;
 
-        console.log(`✅ Upload successful: ${fileUrl}`);
-        res.json({ url: fileUrl });
+		console.log(`✅ Upload successful: ${fileUrl}`);
+		res.json({ url: fileUrl });
 
-    } catch (error) {
-        console.error('❌ Conversion or Upload Failed:', error);
-        res.status(500).json({ error: 'Failed to convert or upload audio file.' });
+	} catch (error) {
+		console.error('❌ Conversion or Upload Failed:', error);
+		res.status(500).json({ error: 'Failed to convert or upload audio file.' });
 
-    } finally {
-        // 4. Clean up temporary files on disk
-        if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
-        if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
-    }
+	} finally {
+		if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+		if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
+	}
 });
-
 
 // SHOWS
 app.post('/api/shows', (req, res) => {
@@ -197,7 +242,7 @@ app.delete('/api/shows/:showId/characters/:charId', (req, res) => {
 	res.json({ success: true });
 });
 
-// CAST ROSTER (SETTING ACTOR & AVATAR PER CHARACTER)
+// CAST ROSTER
 app.put('/api/shows/:showId/casts/:castId/roster/:charId', (req, res) => {
 	const db = readDB();
 	const show = db.shows.find((s) => s.id === req.params.showId);
@@ -207,14 +252,8 @@ app.put('/api/shows/:showId/casts/:castId/roster/:charId', (req, res) => {
 	if (!cast.members) cast.members = {};
 	const { actor, avatarUrl } = req.body;
 	cast.members[req.params.charId] = {
-		actor:
-			actor !== undefined
-				? actor
-				: cast.members[req.params.charId]?.actor || '',
-		avatarUrl:
-			avatarUrl !== undefined
-				? avatarUrl
-				: cast.members[req.params.charId]?.avatarUrl || '',
+		actor: actor !== undefined ? actor : cast.members[req.params.charId]?.actor || '',
+		avatarUrl: avatarUrl !== undefined ? avatarUrl : cast.members[req.params.charId]?.avatarUrl || '',
 	};
 
 	saveDB(db);
@@ -330,7 +369,7 @@ app.post(
 		const cue = list?.cues.find((c) => c.id === req.params.cueId);
 
 		if (!cue) return res.status(404).json({ error: 'Cue not found' });
-
+		if (!cue.castStems) cue.castStems = {};
 		if (!cue.castStems[castId]) cue.castStems[castId] = [];
 
 		cue.castStems[castId] = cue.castStems[castId].filter(
@@ -352,7 +391,7 @@ app.delete(
 		const list = show?.cueLists.find((l) => l.id === req.params.listId);
 		const cue = list?.cues.find((c) => c.id === req.params.cueId);
 
-		if (cue && cue.castStems[castId]) {
+		if (cue && cue.castStems && cue.castStems[castId]) {
 			cue.castStems[castId].splice(parseInt(index, 10), 1);
 			saveDB(db);
 		}
@@ -366,8 +405,7 @@ app.put('/api/shows/:showId/active', (req, res) => {
 	if (!show) return res.status(404).json({ error: 'Show not found' });
 
 	if (req.body.activeCastId) show.activeCastId = req.body.activeCastId;
-	if (req.body.activeCueListId)
-		show.activeCueListId = req.body.activeCueListId;
+	if (req.body.activeCueListId) show.activeCueListId = req.body.activeCueListId;
 
 	saveDB(db);
 	res.json(show);
@@ -377,7 +415,6 @@ app.put('/api/shows/:showId/active', (req, res) => {
 const shows = {};
 
 io.on('connection', (socket) => {
-	// Clock sync for network latency & server offset compensation
 	socket.on('clock-sync', (data) => {
 		socket.emit('clock-sync-response', {
 			clientSendTime: data.clientSendTime,
@@ -385,23 +422,31 @@ io.on('connection', (socket) => {
 		});
 	});
 
-	// Handle client joining a show channel
+	const sendActiveCueToSocket = (targetSocket, showId) => {
+		if (shows[showId] && shows[showId].activeCue && shows[showId].startTime) {
+			const currentSeekTime = (Date.now() - shows[showId].startTime) / 1000;
+			targetSocket.emit('cue-triggered', {
+				activeCue: shows[showId].activeCue,
+				currentSeekTime: Math.max(0, currentSeekTime),
+				serverTimestamp: Date.now(),
+			});
+		}
+	};
+
 	socket.on('join-show', ({ showId }) => {
 		if (!showId) return;
 		socket.join(showId);
 
 		if (!shows[showId]) {
 			shows[showId] = { activeCue: null, startTime: null };
-		} else if (shows[showId].activeCue && shows[showId].startTime) {
-			// Send active playback & current seek time directly to the joining socket
-			const currentSeekTime =
-				(Date.now() - shows[showId].startTime) / 1000;
-			socket.emit('cue-triggered', {
-				activeCue: shows[showId].activeCue,
-				currentSeekTime: Math.max(0, currentSeekTime),
-				serverTimestamp: Date.now(),
-			});
+		} else {
+			sendActiveCueToSocket(socket, showId);
 		}
+	});
+
+	socket.on('request-current-state', ({ showId }) => {
+		const targetShow = showId || 'main-show';
+		sendActiveCueToSocket(socket, targetShow);
 	});
 
 	// Trigger a cue for all clients
@@ -411,56 +456,33 @@ io.on('connection', (socket) => {
 		const db = readDB();
 		const show = db.shows.find((s) => s.id === showId);
 
+		let fullCue = rawCue;
 		let tracks = [];
+
 		if (show && rawCue) {
-			// Automatically locate the list containing this cue and save active IDs
-			const parentCueList = show.cueLists?.find((l) =>
-				l.cues?.some((c) => c.id === rawCue.id)
-			);
-			if (parentCueList) {
-				show.activeCueListId = parentCueList.id;
-			}
-			show.activeCueId = rawCue.id;
-			saveDB(db); // Emits 'database-updated' to index.html automatically
-
-			const activeCastId = show.activeCastId || 'cast-main';
-			const activeCast = show.casts.find((c) => c.id === activeCastId);
-
-			if (rawCue.instrumentalUrl) {
-				tracks.push({
-					id: 'inst',
-					name: '🎵 Instrumental',
-					src: rawCue.instrumentalUrl,
-					avatar: '',
-				});
-			}
-
-			const stems =
-				rawCue.castStems && rawCue.castStems[activeCastId]
-					? rawCue.castStems[activeCastId]
-					: [];
-			stems.forEach((stem, idx) => {
-				const charDef = show.characters.find(
-					(c) => c.id === stem.characterId
-				);
-				const memberInfo = activeCast?.members
-					? activeCast.members[stem.characterId]
-					: null;
-
-				const charName = charDef ? charDef.name : 'Role';
-				const actorName = memberInfo?.actor || 'Actor';
-				const avatarUrl = memberInfo?.avatarUrl || '';
-
-				tracks.push({
-					id: `stem-${idx}`,
-					name: `${charName} (${actorName})`,
-					src: stem.audioUrl,
-					avatar: avatarUrl,
-				});
+			// Find full cue object in database if incomplete
+			show.cueLists?.forEach((list) => {
+				const found = list.cues?.find((c) => c.id === rawCue.id);
+				if (found) {
+					fullCue = found;
+					show.activeCueListId = list.id;
+				}
 			});
+
+			show.activeCueId = fullCue.id;
+			saveDB(db);
+
+			// Extract tracks using helper
+			tracks = buildCueTracks(show, fullCue);
+		} else if (rawCue && Array.isArray(rawCue.tracks)) {
+			tracks = rawCue.tracks;
 		}
 
-		const payload = { id: rawCue?.id, name: rawCue?.name || 'Cue', tracks };
+		const payload = { 
+			id: fullCue?.id, 
+			name: fullCue?.name || 'Cue', 
+			tracks 
+		};
 
 		shows[showId] = {
 			activeCue: payload,
@@ -478,14 +500,12 @@ io.on('connection', (socket) => {
 	// SEEK / JUMP TO POSITION IN CUE
 	socket.on('seek-cue', (data) => {
 		const showId = data?.showId || 'main-show';
-		const position = data?.position || 0; // Target timestamp in seconds
+		const position = data?.position || 0;
 
 		if (shows[showId] && shows[showId].activeCue) {
-			// Recalculate virtual startTime based on new seek position
 			shows[showId].startTime = Date.now() - position * 1000;
 		}
 
-		// Broadcast seek event to all viewers & controllers in room
 		io.to(showId).emit('cue-seeked', { showId, position });
 		io.to(showId).emit('cue-position-sync', {
 			showId,
@@ -493,14 +513,11 @@ io.on('connection', (socket) => {
 		});
 	});
 
-	// REAL-TIME PLAYHEAD POSITION SYNC FROM CLIENTS / PLAYERS
 	socket.on('cue-position-sync', (data) => {
 		const showId = data?.showId || 'main-show';
-		// Broadcast player progress to other room members (e.g. admin dashboard)
 		socket.to(showId).emit('cue-position-sync', data);
 	});
 
-	// Stop current cue
 	socket.on('stop-show', (data) => {
 		const target = data?.showId || 'main-show';
 		if (shows[target]) {
@@ -508,7 +525,6 @@ io.on('connection', (socket) => {
 			shows[target].startTime = null;
 		}
 
-		// Clear activeCueId in DB so index UI switches back to Standby
 		const db = readDB();
 		const show = db.shows.find((s) => s.id === target);
 		if (show) {
