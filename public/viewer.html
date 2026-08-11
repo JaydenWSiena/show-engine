@@ -745,6 +745,8 @@
 
         fetchShowInfo();
 
+        socket.off('cue-triggered');
+        
         socket.on('cue-triggered', (state) => {
             if (!audioUnlocked) { pendingCueState = state; return; }
             pendingCueState = null;
