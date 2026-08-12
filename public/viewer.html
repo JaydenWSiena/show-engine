@@ -27,8 +27,8 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 0 10px 8px;
-            min-height: 100vh;
+            padding: 8px 10px 8px;
+            height: 100vh;
             overflow-x: hidden;
             overflow-y: hidden;
             display: flex;
@@ -84,14 +84,14 @@
         .header {
             position: relative;
             z-index: 2;
-            margin-top: 20px;
+            margin-top: 12px;
             text-align: center;
-            background: rgba(15, 15, 26, 0.85);
+            background: rgba(15, 15, 26, 0.82);
             backdrop-filter: blur(14px);
             border-radius: 20px;
-            padding: 12px 28px;
-            border: 1px solid rgba(124, 58, 237, 0.25);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            padding: 10px 22px;
+            border: 1px solid rgba(124, 58, 237, 0.22);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.42);
         }
 
         .status-badge {
@@ -124,16 +124,16 @@
         #stage-container {
             position: relative;
             width: min(100%, 520px);
-            height: min(55vw, 260px);
-            max-height: 300px;
-            margin: 14px auto 8px;
+            height: min(52vw, 240px);
+            max-height: 260px;
+            margin: 12px auto 6px;
             z-index: 1;
             pointer-events: none;
             border-radius: 28px;
             overflow: hidden;
             background: transparent;
             box-shadow: none;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: none;
         }
 
         /* --- LOADING INDICATOR --- */
@@ -274,26 +274,26 @@
         #bottom-console {
             position: relative;
             z-index: 10;
-            margin: 0 auto 18px;
+            margin: 0 auto 14px;
             width: min(100%, 980px);
-            background: rgba(17, 17, 24, 0.94);
-            backdrop-filter: blur(22px);
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            border-radius: 28px;
-            padding: 14px;
+            background: rgba(17, 17, 24, 0.92);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 26px;
+            padding: 12px;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 14px;
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+            gap: 12px;
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
             max-width: 92vw;
         }
 
         .audience-footer {
-            margin: 0 auto 16px;
+            margin: 0 auto 10px;
             width: min(100%, 980px);
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 18px;
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.08);
             color: #cbd5e1;
             font-size: 12px;
@@ -438,6 +438,44 @@
             color: var(--muted);
             font-size: 14px;
             padding: 10px 20px;
+        }
+
+        @media (max-width: 420px) {
+            .header {
+                margin-top: 8px;
+                padding: 10px 16px;
+            }
+
+            .header h2 {
+                font-size: 16px;
+            }
+
+            #stage-container {
+                height: min(58vw, 200px);
+                max-height: 220px;
+                margin: 10px auto 6px;
+            }
+
+            #bottom-console {
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .fader-strip {
+                padding: 12px 14px;
+                gap: 8px;
+            }
+
+            .fader-strip-name {
+                font-size: 11px;
+                max-width: 140px;
+            }
+
+            .audience-footer {
+                font-size: 11px;
+                padding: 8px 12px;
+                margin-bottom: 8px;
+            }
         }
     </style>
 </head>
