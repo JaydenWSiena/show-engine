@@ -636,16 +636,13 @@
             if (cue.castStems) {
                 let rawStems = [];
 
-                if (activeCastId && cue.castStems[activeCastId]) {
+                if (Array.isArray(cue.castStems)) {
+                    rawStems = cue.castStems;
+                } else if (activeCastId && cue.castStems[activeCastId]) {
                     const castGroup = cue.castStems[activeCastId];
                     rawStems = Array.isArray(castGroup) ? castGroup : Object.values(castGroup);
-                } else if (Array.isArray(cue.castStems)) {
-                    rawStems = cue.castStems;
                 } else {
-                    Object.values(cue.castStems).forEach(group => {
-                        const items = Array.isArray(group) ? group : [group];
-                        rawStems.push(...items);
-                    });
+                    rawStems = [];
                 }
 
                 rawStems.forEach((stem, idx) => {
@@ -1116,20 +1113,34 @@
 
         async function onLiveCastChange() {
             const activeCastId = document.getElementById('live-cast-select').value;
-            await fetch(`/api/shows/${activeShowId}/active`, {
+            const res = await fetch(`/api/shows/${activeShowId}/active`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activeCastId })
             });
+            if (!res.ok) return;
+            const updatedShow = await res.json();
+            const showIndex = db.shows.findIndex(s => s.id === activeShowId);
+            if (showIndex !== -1) db.shows[showIndex] = updatedShow;
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
         }
 
         async function onLiveCueListChange() {
             const activeCueListId = document.getElementById('live-cuelist-select').value;
-            await fetch(`/api/shows/${activeShowId}/active`, {
+            const res = await fetch(`/api/shows/${activeShowId}/active`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ activeCueListId })
             });
+            if (!res.ok) return;
+            const updatedShow = await res.json();
+            const showIndex = db.shows.findIndex(s => s.id === activeShowId);
+            if (showIndex !== -1) db.shows[showIndex] = updatedShow;
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
         }
 
         function triggerGo() {

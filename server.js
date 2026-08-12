@@ -117,12 +117,10 @@ function buildCueTracks(show, cue) {
 	const activeCast = show?.casts?.find((c) => c.id === activeCastId);
 
 	let stems = [];
-	if (cue.castStems && cue.castStems[activeCastId]) {
+	if (Array.isArray(cue.castStems)) {
+		stems = cue.castStems;
+	} else if (cue.castStems && cue.castStems[activeCastId]) {
 		stems = cue.castStems[activeCastId];
-	} else if (cue.castStems) {
-		Object.values(cue.castStems).forEach((stemArray) => {
-			if (Array.isArray(stemArray)) stems.push(...stemArray);
-		});
 	}
 
 	stems.forEach((stem, idx) => {
