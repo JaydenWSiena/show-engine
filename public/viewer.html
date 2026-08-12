@@ -281,6 +281,19 @@
             flex-wrap: wrap;
         }
 
+        .audience-footer {
+            margin: 0 auto 24px;
+            max-width: 92vw;
+            padding: 12px 20px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            font-size: 13px;
+            text-align: center;
+            z-index: 10;
+        }
+
         .fader-strip {
             display: flex;
             flex-direction: column;
@@ -445,6 +458,8 @@
     <div id="bottom-console">
         <div class="empty-state">No active tracks</div>
     </div>
+
+    <div id="viewer-audience-footer" class="audience-footer">0 audience members</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -936,6 +951,16 @@
         socket.on('cue-seeked', (data) => {
             if (data && typeof data.position === 'number') {
                 stemEngine.seek(data.position, currentTracksCache);
+            }
+        });
+
+        socket.off('audience-count');
+        socket.on('audience-count', (data) => {
+            if (data.showId === showId) {
+                const audienceFooter = document.getElementById('viewer-audience-footer');
+                if (audienceFooter) {
+                    audienceFooter.innerText = `${data.count} audience member${data.count === 1 ? '' : 's'}`;
+                }
             }
         });
 

@@ -529,8 +529,20 @@ io.on('connection', (socket) => {
 		}
 	};
 
+	async function broadcastAudienceCount(showId) {
+		if (!showId) return;
+		const sockets = await io.in(showId).fetchSockets();
+		const count = sockets.filter((s) => s.data.clientType === 'viewer').length;
+		io.to(showId).emit('audience-count', { showId, count });
+		io.to('admin-room').emit('audience-count', { showId, count });
+	}
+
 	socket.on('join-show', ({ showId }) => {
 		if (!showId) return;
+		if (socket.data.clientType !== 'admin') {
+			socket.data.clientType = 'viewer';
+		}
+		socket.data.showId = showId;
 		socket.join(showId);
 
 		if (!shows[showId]) {
@@ -538,11 +550,19 @@ io.on('connection', (socket) => {
 		} else {
 			sendActiveCueToSocket(socket, showId);
 		}
+
+		broadcastAudienceCount(showId);
 	});
 
 	socket.on('request-current-state', ({ showId }) => {
 		const targetShow = showId || 'main-show';
 		sendActiveCueToSocket(socket, targetShow);
+	});
+
+	socket.on('disconnect', () => {
+		if (socket.data && socket.data.showId) {
+			broadcastAudienceCount(socket.data.showId);
+		}
 	});
 
 	// Trigger a cue for all clients
