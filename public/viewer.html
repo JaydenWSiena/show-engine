@@ -31,7 +31,7 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 8px 10px 40px;
+            padding: 8px 10px 0;
             height: 100vh;
             overflow-x: hidden;
             overflow-y: hidden;
@@ -52,6 +52,7 @@
             flex: 1 1 auto;
             justify-content: flex-start;
             gap: 12px;
+            padding-bottom: 52px;
         }
 
         #visualizer-canvas {
@@ -311,11 +312,12 @@
 
         .audience-footer {
             position: fixed;
-            left: 50%;
+            left: 0;
+            right: 0;
             bottom: 0;
-            transform: translateX(-50%);
-            margin: 0;
-            width: min(100%, 980px);
+            margin: 0 auto;
+            max-width: 980px;
+            width: 100%;
             padding: 8px 14px;
             background: transparent;
             border: none;
@@ -490,10 +492,14 @@
                 margin: 8px auto 4px;
             }
 
+            #viewer-content {
+                padding-bottom: 64px;
+            }
+
             #bottom-console {
                 padding: 10px;
                 gap: 10px;
-                max-height: calc(100vh - 260px);
+                max-height: calc(100vh - 240px);
             }
 
             .fader-strip {
