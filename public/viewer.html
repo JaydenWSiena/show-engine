@@ -27,7 +27,7 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 8px 10px 8px;
+            padding: 8px 10px 40px;
             height: 100vh;
             overflow-x: hidden;
             overflow-y: hidden;
@@ -36,6 +36,17 @@
             align-items: center;
             justify-content: flex-start;
             text-rendering: optimizeLegibility;
+        }
+
+        #viewer-content {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 980px;
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            justify-content: space-between;
         }
 
         #visualizer-canvas {
@@ -274,31 +285,39 @@
         #bottom-console {
             position: relative;
             z-index: 10;
-            margin: 0 auto 14px;
+            margin: 0 auto 8px;
             width: min(100%, 980px);
             background: rgba(17, 17, 24, 0.92);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 26px;
-            padding: 12px;
+            padding: 10px 12px 12px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
             box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
             max-width: 92vw;
+            margin-top: auto;
+            max-height: calc(100vh - 360px);
+            overflow-y: auto;
         }
 
         .audience-footer {
-            margin: 0 auto 10px;
+            position: fixed;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            margin: 0;
             width: min(100%, 980px);
             padding: 8px 14px;
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: transparent;
+            border: none;
+            box-shadow: none;
             color: #cbd5e1;
             font-size: 12px;
             text-align: center;
-            z-index: 10;
+            z-index: 12;
+            pointer-events: none;
         }
 
         .fader-strip {
@@ -308,10 +327,11 @@
             width: 100%;
             min-width: 0;
             background: rgba(24, 24, 36, 0.88);
-            padding: 14px 16px;
+            padding: 12px 14px;
             border-radius: 20px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+            min-height: 112px;
         }
 
         .fader-strip.boosted {
@@ -443,7 +463,7 @@
         @media (max-width: 420px) {
             .header {
                 margin-top: 8px;
-                padding: 10px 16px;
+                padding: 10px 14px;
             }
 
             .header h2 {
@@ -451,30 +471,32 @@
             }
 
             #stage-container {
-                height: min(58vw, 200px);
-                max-height: 220px;
-                margin: 10px auto 6px;
+                height: min(60vw, 180px);
+                max-height: 200px;
+                margin: 8px auto 4px;
             }
 
             #bottom-console {
                 padding: 10px;
                 gap: 10px;
+                max-height: calc(100vh - 180px - 60px);
             }
 
             .fader-strip {
                 padding: 12px 14px;
                 gap: 8px;
+                min-height: 96px;
             }
 
             .fader-strip-name {
                 font-size: 11px;
-                max-width: 140px;
+                max-width: 120px;
             }
 
             .audience-footer {
                 font-size: 11px;
                 padding: 8px 12px;
-                margin-bottom: 8px;
+                margin-bottom: 0;
             }
         }
     </style>
@@ -492,20 +514,22 @@
         <button class="btn-unlock" onclick="unlockAudio()">Join Audio Stream</button>
     </div>
 
-    <div class="header">
-        <div id="show-title"
-            style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;">
-            Loading Show...</div>
-        <div id="show-status" class="status-badge">Waiting for show to start...</div>
-        <div class="cue-header-main">
-            <h2 id="cue-title">Standby</h2>
+    <div id="viewer-content">
+        <div class="header">
+            <div id="show-title"
+                style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;">
+                Loading Show...</div>
+            <div id="show-status" class="status-badge">Waiting for show to start...</div>
+            <div class="cue-header-main">
+                <h2 id="cue-title">Standby</h2>
+            </div>
         </div>
-    </div>
 
-    <div id="stage-container"></div>
+        <div id="stage-container"></div>
 
-    <div id="bottom-console">
-        <div class="empty-state">No active tracks</div>
+        <div id="bottom-console">
+            <div class="empty-state">No active tracks</div>
+        </div>
     </div>
 
     <div id="viewer-audience-footer" class="audience-footer">0 audience members</div>
