@@ -661,7 +661,7 @@
                 });
             }
 
-            if (tracks.length === 0 && cue.tracks && Array.isArray(cue.tracks)) {
+            if (!cue.castStems && tracks.length === 0 && cue.tracks && Array.isArray(cue.tracks)) {
                 tracks = cue.tracks;
             }
 
@@ -1113,6 +1113,14 @@
 
         async function onLiveCastChange() {
             const activeCastId = document.getElementById('live-cast-select').value;
+            const show = getSelectedShowById(activeShowId);
+            if (show) {
+                show.activeCastId = activeCastId;
+            }
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
+
             const res = await fetch(`/api/shows/${activeShowId}/active`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },

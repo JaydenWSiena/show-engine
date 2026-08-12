@@ -567,9 +567,11 @@ io.on('connection', (socket) => {
 			show.activeCueId = fullCue.id;
 			saveDB(db, showId);
 
-			tracks = buildCueTracks(show, fullCue);
-		} else if (rawCue && Array.isArray(rawCue.tracks)) {
-			tracks = rawCue.tracks;
+			if (rawCue.tracks && Array.isArray(rawCue.tracks)) {
+				tracks = rawCue.tracks;
+			} else {
+				tracks = buildCueTracks(show, fullCue);
+			}
 		}
 
 		const payload = {
