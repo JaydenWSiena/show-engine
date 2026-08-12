@@ -2,1304 +2,1835 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Show Viewer</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Show Control</title>
     <style>
         :root {
-            --bg: #07070d;
-            --card: #111118;
-            --panel: #181824;
-            --border: #28283a;
-            --accent-blue: #2563eb;
-            --accent-purple: #7c3aed;
-            --boost-orange: #f97316;
-            --text: #f4f4f5;
-            --muted: #94a3b8;
-        }
-
-        html, body {
-            height: 100%;
-        }
-
-        *, *::before, *::after {
-            box-sizing: border-box;
+            --bg: #09090b;
+            --card: #141417;
+            --panel: #1e1e24;
+            --border: #2e2e35;
+            --accent: #3b82f6;
+            --go: #16a34a;
+            --stop: #dc2626;
+            --standby: #eab308;
         }
 
         body {
             font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg);
-            color: var(--text);
+            color: #f4f4f5;
             margin: 0;
-            padding: 8px 10px 0;
-            height: 100vh;
-            overflow-x: hidden;
-            overflow-y: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            text-rendering: optimizeLegibility;
+            padding: 20px;
         }
 
-        #viewer-content {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            max-width: 980px;
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 auto;
-            justify-content: flex-start;
-            gap: 12px;
-            padding-bottom: 52px;
-        }
-
-        #visualizer-canvas {
+        #login-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            z-index: 0;
-            opacity: 0.9;
-            pointer-events: none;
-        }
-
-        #unlock-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(7, 7, 13, 0.96);
+            background: var(--bg);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
+            z-index: 9999;
         }
 
-        .btn-unlock {
-            background: linear-gradient(135deg, #1e3a8a, #581c87);
-            color: white;
-            border: 1px solid rgba(124, 58, 237, 0.5);
-            padding: 16px 32px;
-            font-size: 18px;
-            font-weight: bold;
+        .login-box {
+            background: var(--card);
+            padding: 30px;
             border-radius: 12px;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 25px rgba(30, 58, 138, 0.6);
-        }
-
-        .btn-unlock:active {
-            transform: scale(0.95);
-        }
-
-        /* --- HEADER --- */
-        .header {
-            position: relative;
-            z-index: 2;
-            margin-top: 12px;
+            border: 1px solid var(--border);
             text-align: center;
-            background: rgba(15, 15, 26, 0.82);
-            backdrop-filter: blur(14px);
-            border-radius: 20px;
-            padding: 10px 22px;
-            border: 1px solid rgba(124, 58, 237, 0.22);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.42);
+            width: 300px;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            background: rgba(30, 58, 138, 0.3);
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #60a5fa;
-            border: 1px solid rgba(37, 99, 235, 0.3);
-            margin-bottom: 6px;
-            transition: all 0.2s ease;
+        .login-box input {
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 16px;
         }
 
-        .cue-header-main {
+        .app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header-row {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
+            margin-bottom: 20px;
         }
 
-        h2 {
-            margin: 0;
-            font-size: 18px;
-            letter-spacing: 0.5px;
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
         }
 
-        /* --- STAGE CONTAINER --- */
-        #stage-container {
-            position: relative;
-            width: min(100%, 520px);
-            height: min(52vw, 240px);
-            max-height: 260px;
-            margin: 12px auto 6px;
-            z-index: 1;
-            pointer-events: none;
-            border-radius: 28px;
-            overflow: hidden;
+        .tab-btn {
             background: transparent;
-            box-shadow: none;
             border: none;
-        }
-
-        /* --- LOADING INDICATOR --- */
-        #loading-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            background: rgba(17, 17, 24, 0.92);
-            border: 1px solid rgba(124, 58, 237, 0.4);
-            padding: 22px 32px;
-            border-radius: 18px;
-            backdrop-filter: blur(14px);
-            z-index: 100;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
-            pointer-events: auto;
-            min-width: 250px;
-            transition: opacity 0.2s ease;
-        }
-
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid rgba(124, 58, 237, 0.2);
-            border-top-color: var(--accent-purple);
-            border-right-color: var(--accent-blue);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 13px;
+            color: #a1a1aa;
+            padding: 12px 20px;
+            font-size: 15px;
             font-weight: 600;
-            color: var(--text);
-            letter-spacing: 0.5px;
-            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
         }
 
-        .loading-progress-bar {
+        .tab-btn.active {
+            color: white;
+            border-bottom-color: var(--accent);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        input,
+        select,
+        button {
+            background: #27272a;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
             width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            overflow: hidden;
+            box-sizing: border-box;
         }
 
-        .loading-progress-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-            transition: width 0.15s ease-out;
+        button {
+            cursor: pointer;
+            background: var(--accent);
+            font-weight: 600;
+            border: none;
+            transition: 0.1s;
         }
 
-        .orbit-avatar-wrapper {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 48px;
-            height: 48px;
-            margin-top: -24px;
-            margin-left: -24px;
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.btn-go {
+            background: var(--go);
+            font-size: 24px;
+            font-weight: 900;
+            padding: 16px;
+        }
+
+        button.btn-stop {
+            background: var(--stop);
+            font-size: 18px;
+            font-weight: 800;
+            padding: 16px;
+        }
+
+        button.btn-danger {
+            background: var(--stop);
+            color: white;
+            font-weight: bold;
+        }
+
+        button.btn-sm {
+            padding: 6px 12px;
+            width: auto;
+            font-size: 12px;
+        }
+
+        button.btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #e4e4e7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr.active-row {
+            background: #1e293b;
+            font-weight: bold;
+        }
+
+        tr.standby-row {
+            background: #3f2e04;
+            outline: 1px solid var(--standby);
+        }
+
+        .flex-row {
             display: flex;
-            flex-direction: column;
+            gap: 10px;
             align-items: center;
-            justify-content: center;
-            transition: transform 0.1s ease-out;
-            pointer-events: auto;
+            margin-bottom: 8px;
         }
 
-        .avatar-circle {
-            width: 100%;
-            height: 100%;
+        /* FIXED AVATAR PREVIEW CSS */
+        .avatar-preview {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            min-height: 36px;
+            max-width: 36px;
+            max-height: 36px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid var(--border);
-            background: var(--panel);
+            background: #27272a;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+            display: inline-block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .waveform-container {
             position: relative;
-            z-index: 2;
-            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, border-color 0.1s ease-out;
-        }
-
-        .avatar-fallback {
-            position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            background: var(--panel);
-            border: 2px solid var(--border);
-            z-index: 1;
-        }
-
-        .pulse-ring {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid var(--accent-blue);
-            pointer-events: none;
-            z-index: 1;
-            opacity: 0;
-            transform: scale(1);
-            transition: transform 0.08s ease-out, opacity 0.08s ease-out;
-        }
-
-        .avatar-label {
-            position: absolute;
-            bottom: -36px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #f1f5f9;
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
-            white-space: nowrap;
-            background: rgba(7, 7, 13, 0.92);
-            padding: 4px 10px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            pointer-events: none;
-            z-index: 3;
-        }
-
-        /* --- BOTTOM CONSOLE --- */
-        #bottom-console {
-            position: relative;
-            z-index: 10;
-            margin: 0 auto 12px;
-            width: min(100%, 980px);
-            background: rgba(17, 17, 24, 0.92);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 26px;
-            padding: 12px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            grid-auto-rows: minmax(112px, auto);
-            gap: 12px;
-            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
-            max-width: 92vw;
-            max-height: calc(100vh - 320px);
-            overflow-y: auto;
-            overflow-x: hidden;
-            align-items: start;
-        }
-
-        .audience-footer {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            margin: 0 auto;
-            max-width: 980px;
-            width: 100%;
-            padding: 8px 14px;
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            color: #cbd5e1;
-            font-size: 12px;
-            text-align: center;
-            z-index: 12;
-            pointer-events: none;
-        }
-
-        .fader-strip {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 100%;
-            background: rgba(24, 24, 36, 0.92);
-            padding: 12px 14px;
-            border-radius: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-            min-height: 112px;
-            align-items: stretch;
-            justify-content: space-between;
-        }
-
-        .fader-strip.boosted {
-            border-color: rgba(249, 115, 22, 0.4);
-            box-shadow: 0 0 15px rgba(249, 115, 22, 0.15);
-        }
-
-        .fader-strip-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .fader-strip > .vu-meter,
-        .fader-strip > .slider-notch-wrapper {
-            width: 100%;
-        }
-
-        .fader-strip-name {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text);
-            max-width: 100%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .btn-boost {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--muted);
-            font-size: 10px;
-            font-weight: 700;
-            padding: 6px 10px;
+            height: 160px;
+            background: #0d0d11;
             border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            min-width: 72px;
-            text-align: center;
-        }
-
-        .btn-boost:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-
-        .btn-boost.active {
-            background: rgba(249, 115, 22, 0.2);
-            border-color: var(--boost-orange);
-            color: #ffedd5;
-            box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
-        }
-
-        .vu-meter {
-            width: 100%;
-            height: 12px;
-            background: #101016;
-            border-radius: 6px;
-            display: flex;
-            flex-direction: row;
-            justify-content: flex-start;
+            border: 1px solid var(--border);
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: crosshair;
+            margin-top: 10px;
         }
 
-        .vu-fill {
+        #waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .icon {
+            width: 14px;
+            height: 14px;
+            vertical-align: -2px;
+            flex-shrink: 0;
+        }
+
+        h1 .icon,
+        h3 .icon,
+        h4 .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: -3px;
+            margin-right: 6px;
+        }
+
+        .tab-btn .icon {
+            margin-right: 6px;
+        }
+
+        .status-ok {
+            color: var(--go);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-bad {
+            color: #a1a1aa;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #upload-progress-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--card);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 16px 20px;
+            width: 320px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            display: none;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .progress-bar-bg {
+            background: #27272a;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .progress-bar-fill {
+            background: var(--accent);
             height: 100%;
             width: 0%;
-            background: linear-gradient(to right, #1e3a8a 0%, #2563eb 50%, #6b21a8 85%, #9333ea 100%);
-            transition: width 0.05s ease-out;
-        }
-
-        .fader-strip.boosted .vu-fill {
-            background: linear-gradient(to right, #1e3a8a 0%, #2563eb 40%, #f97316 80%, #ef4444 100%);
-        }
-
-        .slider-notch-wrapper {
-            position: relative;
-            width: 100%;
-            display: flex;
-            align-items: center;
-        }
-
-        input[type=range].horizontal-fader {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 14px;
-            background: transparent;
-            margin: 0;
-            cursor: pointer;
-            z-index: 2;
-        }
-
-        input[type=range].horizontal-fader::-webkit-slider-runnable-track {
-            height: 12px;
-            border-radius: 6px;
-            background: repeating-linear-gradient(to right,
-                    rgba(255, 255, 255, 0.4) 0,
-                    rgba(255, 255, 255, 0.4) 2px,
-                    #1e1e2d 2px,
-                    #1e1e2d 6.25%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        input[type=range].horizontal-fader::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            height: 22px;
-            width: 14px;
-            border-radius: 4px;
-            background: #3b82f6;
-            border: 2px solid #ffffff;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-            margin-top: -5px;
-            transition: background 0.2s, border-color 0.2s;
-        }
-
-        .fader-strip.boosted input[type=range].horizontal-fader::-webkit-slider-thumb {
-            background: var(--boost-orange);
-            border-color: #ffedd5;
-        }
-
-        .empty-state {
-            text-align: center;
-            color: var(--muted);
-            font-size: 14px;
-            padding: 10px 20px;
-        }
-
-        @media (max-width: 420px) {
-            .header {
-                margin-top: 8px;
-                padding: 10px 14px;
-            }
-
-            .header h2 {
-                font-size: 16px;
-            }
-
-            #stage-container {
-                height: min(60vw, 160px);
-                max-height: 180px;
-                margin: 8px auto 4px;
-            }
-
-            #viewer-content {
-                padding-bottom: 64px;
-            }
-
-            #bottom-console {
-                padding: 10px;
-                gap: 10px;
-                max-height: calc(100vh - 240px);
-            }
-
-            .fader-strip {
-                flex: 1 1 100%;
-                max-width: 100%;
-                min-width: 0;
-                padding: 12px 14px;
-                gap: 8px;
-                min-height: 96px;
-            }
-
-            .fader-strip-name {
-                font-size: 11px;
-                max-width: 100%;
-            }
-
-            .audience-footer {
-                font-size: 11px;
-                padding: 8px 12px;
-            }
+            transition: width 0.15s ease-out;
         }
     </style>
 </head>
 
 <body>
 
-    <canvas id="visualizer-canvas"></canvas>
-
-    <!-- HTML5 audio element through which Web Audio is piped for iOS/Android background compatibility -->
-    <audio id="ios-background-audio" autoplay playsinline style="display:none;"></audio>
-
-    <div id="unlock-overlay">
-        <h2 style="margin-bottom: 20px;">Ready for the show?</h2>
-        <button class="btn-unlock" onclick="unlockAudio()">Join Audio Stream</button>
+    <div id="upload-progress-container">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <strong id="upload-filename"
+                style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; color: #f4f4f5;">Uploading...</strong>
+            <span id="upload-percent" style="font-size: 13px; color: var(--accent); font-weight: bold;">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div id="upload-progress-fill" class="progress-bar-fill"></div>
+        </div>
     </div>
 
-    <div id="viewer-content">
-        <div class="header">
-            <div id="show-title"
-                style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;">
-                Loading Show...</div>
-            <div id="show-status" class="status-badge">Waiting for show to start...</div>
-            <div class="cue-header-main">
-                <h2 id="cue-title">Standby</h2>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>Admin Login</h2>
+            <input type="password" id="admin-password" placeholder="Enter Password" onkeypress="checkEnter(event)">
+            <button onclick="checkPassword()">Unlock Studio</button>
+            <div id="login-error" style="color: var(--stop); margin-top: 10px; font-size: 14px; display: none;">
+                Incorrect password</div>
+        </div>
+    </div>
+
+    <div class="app">
+        <div class="header-row">
+            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="21" x2="4" y2="14" />
+                    <line x1="4" y1="10" x2="4" y2="3" />
+                    <circle cx="4" cy="12" r="2" />
+                    <line x1="12" y1="21" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12" y2="3" />
+                    <circle cx="12" cy="10" r="2" />
+                    <line x1="20" y1="21" x2="20" y2="16" />
+                    <line x1="20" y1="12" x2="20" y2="3" />
+                    <circle cx="20" cy="14" r="2" />
+                </svg>Show Engine Studio</h1>
+            <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 14px;"
+                onclick="copyViewerLink()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="9" width="8" height="6" rx="3" />
+                    <rect x="13" y="9" width="8" height="6" rx="3" />
+                    <line x1="10" y1="12" x2="14" y2="12" />
+                </svg>Copy Viewer Link</button>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-live', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
+                </svg>Live Control Board</button>
+            <button class="tab-btn" onclick="switchTab('tab-shows', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+                </svg>Shows & Cast Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-cues', event)"><svg class="icon" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                </svg>Song & Stem Builder</button>
+        </div>
+
+        <!-- TAB 1: LIVE CONTROL BOARD -->
+        <div id="tab-live" class="tab-content">
+            <div class="card grid-3">
+                <div>
+                    <label><small>Active Show Room</small></label>
+                    <select id="live-show-select" onchange="onLiveShowChange()"></select>
+                </div>
+                <div>
+                    <label><small>Active Cast</small></label>
+                    <select id="live-cast-select" onchange="onLiveCastChange()"></select>
+                </div>
+                <div>
+                    <label><small>Active Cue List</small></label>
+                    <select id="live-cuelist-select" onchange="onLiveCueListChange()"></select>
+                </div>
+            </div>
+
+            <div class="card grid-2">
+                <button class="btn-go" onclick="triggerGo()">GO [SPACE]</button>
+                <button class="btn-stop" onclick="triggerStop()">STOP [ESC]</button>
+            </div>
+
+            <div class="card">
+                <div class="header-row" style="margin-bottom: 5px;">
+                    <h3>🎛 Active Cue Audio Waveform Scrubber</h3>
+                    <div style="font-size: 13px; color: #a1a1aa;">
+                        Selected Position: <strong id="selected-time-display"
+                            style="color: var(--standby);">00:00.0</strong> /
+                        Current: <strong id="current-time-display" style="color: var(--accent);">00:00.0</strong> /
+                        Total: <strong id="total-time-display" style="color: white;">00:00.0</strong>
+                    </div>
+                </div>
+
+                <div class="waveform-container" onclick="handleWaveformClick(event)">
+                    <canvas id="waveform-canvas"></canvas>
+                </div>
+
+                <div class="flex-row" style="margin-top: 12px; justify-content: space-between;">
+                    <small style="color: #a1a1aa; display:inline-flex; align-items:center; gap:5px;"><svg class="icon"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>Click anywhere on the real waveform to mark a seek target, then
+                        click Skip.</small>
+                    <button class="btn-sm"
+                        style="background: var(--standby); color: black; font-weight: bold; width: auto; padding: 8px 16px;"
+                        onclick="skipToSelectedPosition()">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="5,4 15,12 5,20" />
+                            <line x1="19" y1="5" x2="19" y2="19" />
+                        </svg>Skip to Selected Position
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6" />
+                        <line x1="8" y1="12" x2="21" y2="12" />
+                        <line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" />
+                        <line x1="3" y1="12" x2="3.01" y2="12" />
+                        <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>Live Cue Stack</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cue #</th>
+                            <th>Song Title</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-cue-table"></tbody>
+                </table>
             </div>
         </div>
 
-        <div id="stage-container"></div>
+        <!-- TAB 2: SHOWS & CASTS -->
+        <div id="tab-shows" class="tab-content hidden">
+            <div class="card">
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>Create New Show</h3>
+                <div class="grid-2">
+                    <input type="text" id="new-show-title" placeholder="Show Title (e.g., Musical Main Stage)">
+                    <button onclick="createNewShow()">Create Show</button>
+                </div>
+            </div>
 
-        <div id="bottom-console">
-            <div class="empty-state">No active tracks</div>
+            <div class="card">
+                <div class="header-row" style="margin-bottom: 10px;">
+                    <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+                        </svg>Show Settings</h3>
+                    <button class="btn-danger btn-sm" style="padding: 8px 16px;" onclick="deleteShow()"><svg
+                            class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3,6 5,6 21,6" />
+                            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                        </svg>Delete
+                        Current Show</button>
+                </div>
+                <label><small>Select Show to Edit:</small></label>
+                <select id="edit-show-select" onchange="renderShowSettings()"></select>
+
+                <div class="grid-2" style="margin-top: 15px;">
+                    <div class="panel">
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>1. Define Character Roles</h4>
+                        <div class="flex-row">
+                            <input type="text" id="new-character-name" placeholder="Role Name (e.g., Elphaba)">
+                            <button onclick="addCharacter()">Add Role</button>
+                        </div>
+                        <ul id="character-list" style="margin-top: 15px;"></ul>
+                    </div>
+
+                    <div class="panel">
+                        <h4><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                <path d="M16 3.13a4 4 0 010 7.75" />
+                            </svg>2. Define Casts & Lists</h4>
+                        <div class="flex-row">
+                            <input type="text" id="new-cast-name" placeholder="Cast Name (e.g., Cast A)">
+                            <button onclick="addCast()">Add Cast</button>
+                        </div>
+                        <ul id="cast-list" style="margin-top: 10px;"></ul>
+
+                        <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+
+                        <div class="flex-row">
+                            <input type="text" id="new-cuelist-name" placeholder="Cue List Name (e.g., Act 1)">
+                            <button onclick="addCueList()">Add List</button>
+                        </div>
+                        <ul id="cuelist-list" style="margin-top: 10px;"></ul>
+                    </div>
+                </div>
+
+                <div id="cast-roster-container" style="margin-top: 20px;"></div>
+            </div>
         </div>
-    </div>
 
-    <div id="viewer-audience-footer" class="audience-footer">0 audience members</div>
+        <!-- TAB 3: SONG & STEM BUILDER -->
+        <div id="tab-cues" class="tab-content hidden">
+            <div class="card grid-2">
+                <div>
+                    <label><small>Select Show:</small></label>
+                    <select id="builder-show-select"
+                        onchange="updateBuilderCueListDropdown(); renderCueBuilder();"></select>
+                </div>
+                <div>
+                    <label><small>Select Cue List:</small></label>
+                    <select id="builder-cuelist-select" onchange="renderCueBuilder()"></select>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>Add New Song (Cue)</h3>
+                <div class="grid-3">
+                    <input type="text" id="cue-num" placeholder="Cue # (e.g., 1)">
+                    <input type="text" id="cue-name" placeholder="Song Title (e.g., Opening Number)">
+                    <button onclick="addSongCue()">Add Song</button>
+                </div>
+            </div>
+
+            <div id="song-editor-container"></div>
+        </div>
+
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let audioUnlocked = false;
-        let pendingCueState = null;
-        let currentTracksCache = [];
-        let volumeMemory = {};
-        let boostMemory = {};
+        socket.on('connect', () => socket.emit('register-admin'));
+        let db = { shows: [] };
+        let activeShowId = null;
+        let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false, activeCastId: null };
 
-        let serverClockOffset = 0;
+        // SAFE BASE64 DARK-MODE VECTOR AVATAR DATA-URI (NO QUOTE/STRING ESCAPING ISSUES)
+        const DEFAULT_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI3MjcyYSIgc3Ryb2tlPSIjYTFhMWFhIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCIvPjwvc3ZnPg==";
 
-        const canvas = document.getElementById('visualizer-canvas');
-        const canvasCtx = canvas.getContext('2d');
-
-        let neurons = []; pulses = []; globalOrbitAngle = 0;
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const showId = urlParams.get('showId') || urlParams.get('show') || 'main-show';
-
-        function getFullUrl(src) {
-            if (!src) return '';
-            if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
-                return src;
-            }
-            return `https://${src}`;
+        let dirtyTabs = { 'tab-live': false, 'tab-shows': false, 'tab-cues': false };
+        function getActiveTabId() {
+            const visible = document.querySelector('.tab-content:not(.hidden)');
+            return visible ? visible.id : 'tab-live';
+        }
+        function renderTab(tabId) {
+            if (tabId === 'tab-live') { renderLiveTable(); updateSelectedCueDuration(); drawWaveformScrubber(); }
+            else if (tabId === 'tab-shows') { renderShowSettings(); }
+            else if (tabId === 'tab-cues') { renderCueBuilder(); }
+            dirtyTabs[tabId] = false;
         }
 
-        function showLoadingUI(total) {
-            const stageContainer = document.getElementById('stage-container');
-            if (!stageContainer) return;
-            let loader = document.getElementById('loading-container');
-            if (!loader) {
-                loader = document.createElement('div');
-                loader.id = 'loading-container';
-                loader.innerHTML = `
-                    <div class="spinner"></div>
-                    <div class="loading-text" id="loading-text">Loading audio stems...</div>
-                    <div class="loading-progress-bar">
-                        <div class="loading-progress-fill" id="loading-bar-fill"></div>
-                    </div>
-                `;
-                stageContainer.appendChild(loader);
-            }
-            updateLoadingProgress(0, total);
+        let playbackCurrentTime = 0;
+        let playbackDuration = 180;
+        let activeCueDuration = 180;
+        let playbackStartTime = 0;
+        let selectedSeekTime = 0;
+        let playheadInterval = null;
+        let currentMetadataAudio = null;
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const waveformCache = new Map();
+        const durationCache = new Map();
+
+        const ICON_PATHS = {
+            music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+            pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4z"/>',
+            trash: '<polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>',
+            mic: '<path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+            check: '<polyline points="20,6 9,17 4,12"/>',
+            x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+            user: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        };
+        function icon(name) {
+            const path = ICON_PATHS[name] || '';
+            return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
         }
 
-        function updateLoadingProgress(loaded, total) {
-            const textEl = document.getElementById('loading-text');
-            const fillEl = document.getElementById('loading-bar-fill');
-            const statusBadge = document.getElementById('show-status');
+        function extractTracksFromCue(cue, activeCastId, showCharacters = []) {
+            if (!cue) return [];
+            let tracks = [];
 
-            const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-            
-            if (textEl) textEl.innerText = total > 0 ? `Loading audio stems (${loaded}/${total})...` : 'Loading audio...';
-            if (fillEl) fillEl.style.width = `${pct}%`;
-            
-            if (statusBadge && loaded < total) {
-                statusBadge.innerText = `⏳ Loading Audio (${loaded}/${total})...`;
-                statusBadge.style.color = "#fde047";
-            }
-        }
-
-        function hideLoadingUI() {
-            const loader = document.getElementById('loading-container');
-            if (loader) loader.remove();
-        }
-
-        // ========================================================
-        // SAMPLE-ACCURATE + iOS/ANDROID BACKGROUND COMPATIBLE ENGINE
-        // ========================================================
-        class BulletproofStemEngine {
-            constructor() {
-                this.audioCtx = null;
-                this.masterAnalyser = null;
-                this.masterGain = null;
-                this.streamDest = null;
-                this.iosAudioEl = null;
-                this.stemBuffers = new Map();
-                this.activeInstances = [];
-                this.startTime = 0;
-                this.isPlaying = false;
-                this.playSessionId = 0;
+            if (cue.instrumentalUrl) {
+                tracks.push({
+                    id: 'instrumental',
+                    name: cue.instrumentalName || 'Instrumental',
+                    src: cue.instrumentalUrl,
+                    audioUrl: cue.instrumentalUrl,
+                    avatar: cue.instrumentalAvatar || ''
+                });
             }
 
-            initContext() {
-                if (!this.audioCtx || this.audioCtx.state === 'closed') {
-                    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-                        latencyHint: 'playback',
-                        sampleRate: 44100
-                    });
+            if (cue.castStems) {
+                let rawStems = [];
 
-                    this.masterAnalyser = this.audioCtx.createAnalyser();
-                    this.masterAnalyser.fftSize = 256;
+                if (Array.isArray(cue.castStems)) {
+                    rawStems = cue.castStems;
+                } else if (activeCastId && cue.castStems[activeCastId]) {
+                    const castGroup = cue.castStems[activeCastId];
+                    rawStems = Array.isArray(castGroup) ? castGroup : Object.values(castGroup);
+                } else {
+                    rawStems = [];
+                }
 
-                    this.masterGain = this.audioCtx.createGain();
-                    this.masterGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-
-                    this.masterAnalyser.connect(this.masterGain);
-                    this.iosAudioEl = document.getElementById('ios-background-audio');
-
-                    if (this.audioCtx.createMediaStreamDestination && this.iosAudioEl) {
-                        this.streamDest = this.audioCtx.createMediaStreamDestination();
-                        this.masterGain.connect(this.streamDest);
-                        this.iosAudioEl.srcObject = this.streamDest.stream;
-                    } else {
-                        this.masterGain.connect(this.audioCtx.destination);
+                rawStems.forEach((stem, idx) => {
+                    const audioUrl = stem.audioUrl || stem.url || stem.src;
+                    if (audioUrl) {
+                        const charDef = showCharacters.find(c => c.id === stem.characterId);
+                        tracks.push({
+                            id: stem.id || stem.characterId || `stem-${idx}`,
+                            characterId: stem.characterId,
+                            name: stem.name || charDef?.name || `Character Voice ${idx + 1}`,
+                            src: audioUrl,
+                            audioUrl: audioUrl,
+                            avatar: stem.avatar || ''
+                        });
                     }
-                }
-
-                this.setupMediaSession();
+                });
             }
 
-            async ensureContextRunning() {
-                if (!this.audioCtx || this.audioCtx.state === 'closed') {
-                    this.initContext();
-                }
-                if (this.audioCtx && this.audioCtx.state === 'suspended') {
-                    try {
-                        await this.audioCtx.resume();
-                    } catch (e) {
-                        console.warn('AudioContext resume warning:', e);
+            if (!cue.castStems && tracks.length === 0 && cue.tracks && Array.isArray(cue.tracks)) {
+                tracks = cue.tracks;
+            }
+
+            return tracks;
+        }
+
+        function getSortedCues(cues) {
+            if (!cues || !Array.isArray(cues)) return [];
+            return [...cues].sort((a, b) =>
+                String(a.num || '').localeCompare(String(b.num || ''), undefined, { numeric: true, sensitivity: 'base' })
+            );
+        }
+
+        function checkPassword() {
+            if (document.getElementById('admin-password').value === 'jwojcik') {
+                document.getElementById('login-overlay').style.display = 'none';
+                sessionStorage.setItem('admin_auth', 'true');
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+        function checkEnter(e) { if (e.key === 'Enter') checkPassword(); }
+        if (sessionStorage.getItem('admin_auth') === 'true') document.getElementById('login-overlay').style.display = 'none';
+
+        function copyViewerLink() {
+            if (!activeShowId) return alert("Select a Live Show Room first!");
+            const url = `${window.location.origin}/viewer.html?show=${activeShowId}`;
+            navigator.clipboard.writeText(url).then(() => alert('Viewer link copied!'))
+                .catch(() => prompt("Copy link:", url));
+        }
+
+        async function loadDatabase() {
+            const res = await fetch('/api/database');
+            db = await res.json();
+            db.shows.forEach(s => { if (!s.characters) s.characters = []; });
+            if (!activeShowId && db.shows.length > 0) activeShowId = db.shows[0].id;
+            refreshDropdowns();
+            renderAll();
+        }
+
+        socket.on('database-updated', (updatedDb) => {
+            db = updatedDb;
+            db.shows.forEach(s => { if (!s.characters) s.characters = []; });
+            refreshDropdowns();
+            renderAll();
+        });
+
+        socket.on('cue-position-sync', (data) => {
+            if (data.showId === activeShowId) {
+                playbackCurrentTime = data.currentTime;
+                playbackStartTime = Date.now() - (playbackCurrentTime * 1000);
+                if (data.duration) playbackDuration = data.duration;
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-seeked', (data) => {
+            if (data.showId === activeShowId) {
+                playbackCurrentTime = data.position;
+                playbackStartTime = Date.now() - (playbackCurrentTime * 1000);
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-started', (data) => {
+            if (data.showId === activeShowId) {
+                liveState.isPlaying = true;
+                playbackCurrentTime = 0;
+                playbackStartTime = Date.now();
+                selectedSeekTime = 0;
+                startPlayheadTimer();
+                renderLiveTable();
+                drawWaveformScrubber();
+            }
+        });
+
+        socket.on('cue-stopped', (data) => {
+            if (data.showId === activeShowId) {
+                liveState.isPlaying = false;
+                playbackCurrentTime = 0;
+                stopPlayheadTimer();
+                drawWaveformScrubber();
+                renderLiveTable();
+            }
+        });
+
+        function switchTab(tabId, evt) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.remove('hidden');
+            if (evt) evt.currentTarget.classList.add('active');
+            if (dirtyTabs[tabId]) renderTab(tabId);
+            if (tabId === 'tab-live') {
+                syncPlayheadFromTimestamp();
+                drawWaveformScrubber();
+            }
+        }
+
+        function showUploadProgress(filename) {
+            const container = document.getElementById('upload-progress-container');
+            document.getElementById('upload-filename').innerText = `Uploading ${filename}...`;
+            document.getElementById('upload-percent').innerText = '0%';
+            document.getElementById('upload-progress-fill').style.width = '0%';
+            container.style.display = 'block';
+        }
+
+        function updateUploadProgress(percent) {
+            document.getElementById('upload-percent').innerText = `${percent}%`;
+            document.getElementById('upload-progress-fill').style.width = `${percent}%`;
+        }
+
+        function hideUploadProgress() {
+            const container = document.getElementById('upload-progress-container');
+            setTimeout(() => {
+                container.style.display = 'none';
+            }, 600);
+        }
+
+        function uploadRawFile(file) {
+            showUploadProgress(file.name);
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const fd = new FormData();
+                fd.append('file', file);
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        updateUploadProgress(percent);
                     }
-                }
-                if (this.iosAudioEl && this.iosAudioEl.paused) {
-                    this.iosAudioEl.play().catch(() => {});
-                }
-            }
+                });
 
-            setupMediaSession() {
-                if ('mediaSession' in navigator) {
-                    this.updateMediaSessionMetadata();
-
-                    navigator.mediaSession.setActionHandler('play', async () => {
-                        await this.ensureContextRunning();
-                        if (typeof socket !== 'undefined' && socket) {
-                            socket.emit('request-current-state', { showId: showId });
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            updateUploadProgress(100);
+                            hideUploadProgress();
+                            resolve(data.url);
+                        } catch (err) {
+                            hideUploadProgress();
+                            reject(err);
                         }
-                    });
+                    } else {
+                        hideUploadProgress();
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                });
 
-                    navigator.mediaSession.setActionHandler('pause', () => {
-                        if (this.iosAudioEl) this.iosAudioEl.pause();
-                        this.stopAll();
-                    });
-                }
+                xhr.addEventListener('error', () => { hideUploadProgress(); reject(new Error('Upload failed')); });
+                xhr.addEventListener('abort', () => { hideUploadProgress(); reject(new Error('Upload aborted')); });
+
+                xhr.open('POST', '/api/upload');
+                xhr.send(fd);
+            });
+        }
+
+        async function createNewShow() {
+            const title = document.getElementById('new-show-title').value;
+            if (!title) return;
+            await fetch('/api/shows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+            document.getElementById('new-show-title').value = '';
+        }
+
+        async function deleteShow() {
+            const show = getSelectedShow('edit-show-select');
+            if (!show || !confirm(`Delete "${show.title}"?`)) return;
+            await fetch(`/api/shows/${show.id}`, { method: 'DELETE' });
+            activeShowId = null;
+        }
+
+        async function addCharacter() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-character-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/characters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-character-name').value = '';
+        }
+
+        async function editCharacter(showId, charId) {
+            const char = getSelectedShowById(showId).characters.find(c => c.id === charId);
+            const newName = prompt("New name:", char.name);
+            if (newName) {
+                await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
             }
+        }
 
-            updateMediaSessionMetadata(cueName, showName) {
-                if ('mediaSession' in navigator) {
-                    const title = cueName || document.getElementById('cue-title')?.innerText || "Live Performance";
-                    const artist = showName || document.getElementById('show-title')?.innerText || "Live Show";
-
-                    navigator.mediaSession.metadata = new MediaMetadata({
-                        title: title,
-                        artist: artist,
-                        album: "Multitrack Live Stream"
-                    });
-                }
+        async function deleteCharacter(showId, charId) {
+            if (confirm("Delete character?")) {
+                await fetch(`/api/shows/${showId}/characters/${charId}`, { method: 'DELETE' });
             }
+        }
 
-            async preloadBuffer(src) {
-                if (!src) return null;
-                const fullUrl = getFullUrl(src);
-                if (this.stemBuffers.has(fullUrl)) return this.stemBuffers.get(fullUrl);
+        async function addCast() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-cast-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/casts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-cast-name').value = '';
+        }
 
+        async function deleteCast(showId, castId) {
+            if (confirm("Delete cast?")) {
+                const res = await fetch(`/api/shows/${showId}/casts/${castId}`, { method: 'DELETE' });
+                if (!res.ok) alert((await res.json()).error);
+            }
+        }
+
+        async function updateRosterMember(showId, castId, charId) {
+            const actorInput = document.getElementById(`actor-input-${castId}-${charId}`);
+            const avatarInput = document.getElementById(`avatar-file-${castId}-${charId}`);
+
+            let avatarUrl = undefined;
+            if (avatarInput.files[0]) {
+                avatarInput.disabled = true;
                 try {
-                    await this.ensureContextRunning();
-                    const res = await fetch(fullUrl);
-                    if (!res.ok) throw new Error(`Fetch failed HTTP ${res.status}`);
-                    const arrayBuffer = await res.arrayBuffer();
-                    
-                    // Decode with 5s non-blocking fallback timeout to prevent page freezes
-                    const audioBuffer = await new Promise((resolve, reject) => {
-                        let settled = false;
-                        const timer = setTimeout(() => {
-                            if (!settled) {
-                                settled = true;
-                                reject(new Error('Audio decode timeout'));
-                            }
-                        }, 5000);
-
-                        this.audioCtx.decodeAudioData(
-                            arrayBuffer,
-                            (buffer) => {
-                                if (!settled) { settled = true; clearTimeout(timer); resolve(buffer); }
-                            },
-                            (err) => {
-                                if (!settled) { settled = true; clearTimeout(timer); reject(err); }
-                            }
-                        );
-                    });
-
-                    this.stemBuffers.set(fullUrl, audioBuffer);
-                    return audioBuffer;
+                    avatarUrl = await uploadRawFile(avatarInput.files[0]);
                 } catch (err) {
-                    console.error(`❌ Failed to decode audio stem (${fullUrl}):`, err);
-                    return null;
+                    alert("Avatar upload failed: " + err.message);
+                    avatarInput.disabled = false;
+                    return;
                 }
+                avatarInput.disabled = false;
             }
 
-            async preloadAllStems(tracks) {
-                if (!tracks || !Array.isArray(tracks)) return;
-                await this.ensureContextRunning();
-                const loadPromises = tracks.map(track => {
-                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.instrumentalUrl || track.url);
-                    return this.preloadBuffer(src);
+            await fetch(`/api/shows/${showId}/casts/${castId}/roster/${charId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actor: actorInput.value, avatarUrl })
+            });
+        }
+
+        async function addCueList() {
+            const show = getSelectedShow('edit-show-select');
+            const name = document.getElementById('new-cuelist-name').value;
+            if (!show || !name) return;
+            await fetch(`/api/shows/${show.id}/cuelists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            document.getElementById('new-cuelist-name').value = '';
+        }
+
+        async function addSongCue() {
+            const show = getSelectedShow('builder-show-select');
+            const listId = document.getElementById('builder-cuelist-select').value;
+            const num = document.getElementById('cue-num').value;
+            const name = document.getElementById('cue-name').value;
+            if (!show || !listId) return;
+
+            await fetch(`/api/shows/${show.id}/cuelists/${listId}/cues`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num, name })
+            });
+            document.getElementById('cue-num').value = '';
+            document.getElementById('cue-name').value = '';
+        }
+
+        async function editSongCue(showId, listId, cueId, currentNum, currentName) {
+            const newNum = prompt("Enter Cue Number:", currentNum);
+            if (newNum === null) return;
+            const newName = prompt("Enter Song Title:", currentName);
+            if (newName === null) return;
+
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num: newNum, name: newName })
+            });
+        }
+
+        async function deleteSongCue(showId, listId, cueId, cueName) {
+            if (!confirm(`Are you sure you want to delete Cue "${cueName}"?`)) return;
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                method: 'DELETE'
+            });
+        }
+
+        async function uploadInstrumental(input, showId, listId, cueId) {
+            if (!input.files[0]) return;
+            input.disabled = true;
+            try {
+                const url = await uploadRawFile(input.files[0]);
+                await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instrumentalUrl: url })
                 });
-                await Promise.all(loadPromises);
+            } catch (err) {
+                alert("Upload failed: " + err.message);
+            } finally {
+                input.disabled = false;
             }
+        }
 
-            async playTracks(tracks, targetSeekTime = 0, onProgress = null) {
-                await this.ensureContextRunning();
-                this.stopAll();
+        async function addStem(showId, listId, cueId, castId) {
+            const charSelect = document.getElementById(`charSelect-${cueId}-${castId}`);
+            const characterId = charSelect.value;
+            const audioInput = document.getElementById(`audio-${cueId}-${castId}`);
+            const audioFile = audioInput.files[0];
 
-                this.isPlaying = true;
-                const currentSessionId = ++this.playSessionId;
-                const loadStartTime = performance.now();
+            if (!characterId) return alert("Select a character role.");
+            if (!audioFile) return alert("Audio file is required.");
 
-                let loadedCount = 0;
-                const totalCount = tracks.length;
-                if (onProgress) onProgress(0, totalCount);
+            audioInput.disabled = true;
+            charSelect.disabled = true;
 
-                const loadPromises = tracks.map(async (track) => {
-                    const src = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
-                    const buf = await this.preloadBuffer(src);
-                    loadedCount++;
-                    if (onProgress) onProgress(loadedCount, totalCount);
-                    return buf;
+            try {
+                const audioUrl = await uploadRawFile(audioFile);
+                await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/stems`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ castId, characterId, audioUrl })
                 });
-                await Promise.all(loadPromises);
+            } catch (err) {
+                alert("Stem upload failed: " + err.message);
+            } finally {
+                audioInput.disabled = false;
+                charSelect.disabled = false;
+            }
+        }
 
-                if (!this.isPlaying || currentSessionId !== this.playSessionId) {
+        async function deleteStem(showId, listId, cueId, castId, index) {
+            await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/stems/${castId}/${index}`, { method: 'DELETE' });
+        }
+
+        function renderShowSettings() {
+            const show = getSelectedShow('edit-show-select');
+            if (!show) return;
+
+            document.getElementById('character-list').innerHTML = (show.characters || []).map(c => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${c.name}</strong>
+          <div>
+            <button class="btn-sm" style="background:var(--standby); color:black;" onclick="editCharacter('${show.id}', '${c.id}')">Edit</button>
+            <button class="btn-sm" style="background:var(--stop);" onclick="deleteCharacter('${show.id}', '${c.id}')">Del</button>
+          </div>
+        </li>
+      `).join('');
+
+            document.getElementById('cast-list').innerHTML = show.casts.map(c => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${c.name}</strong>
+          <button class="btn-sm" style="background:var(--stop);" onclick="deleteCast('${show.id}', '${c.id}')">Del</button>
+        </li>
+      `).join('');
+
+            document.getElementById('cuelist-list').innerHTML = show.cueLists.map(l => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:8px; margin-bottom:6px; border-radius:4px;">
+          <strong>${l.name}</strong>
+        </li>
+      `).join('');
+
+            const rosterContainer = document.getElementById('cast-roster-container');
+            rosterContainer.innerHTML = show.casts.map(cast => `
+        <div class="card" style="border-left: 4px solid var(--accent);">
+          <h3>${icon('user')}Roster & Actor Settings for: ${cast.name}</h3>
+          <p><small style="color:#a1a1aa;">Upload actor photos and assign actor names once for this cast.</small></p>
+          
+          ${show.characters.map(char => {
+                const member = (cast.members && cast.members[char.id]) ? cast.members[char.id] : { actor: '', avatarUrl: '' };
+                return `
+              <div class="panel flex-row" style="gap:15px; align-items:center;">
+                <img src="${member.avatarUrl || DEFAULT_AVATAR}" onerror="this.src='${DEFAULT_AVATAR}'" class="avatar-preview">
+                <div style="width:150px;"><strong>${char.name}</strong></div>
+                <input type="text" id="actor-input-${cast.id}-${char.id}" placeholder="Actor Name" value="${member.actor || ''}" style="width:200px;">
+                <input type="file" id="avatar-file-${cast.id}-${char.id}" accept="image/*" style="width:220px;">
+                <button class="btn-sm" onclick="updateRosterMember('${show.id}', '${cast.id}', '${char.id}')">Save Roster Entry</button>
+              </div>
+            `;
+            }).join('')}
+        </div>
+      `).join('');
+        }
+
+        function renderCueBuilder() {
+            const show = getSelectedShow('builder-show-select');
+            const container = document.getElementById('song-editor-container');
+            if (!show) return container.innerHTML = '';
+
+            const listId = document.getElementById('builder-cuelist-select').value;
+            const cueList = show.cueLists.find(cl => cl.id === listId);
+            if (!cueList) return container.innerHTML = '';
+
+            const charOptions = show.characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            const sortedCues = getSortedCues(cueList.cues);
+
+            container.innerHTML = sortedCues.map(cue => `
+        <div class="card" style="border-left: 4px solid var(--accent);">
+          <div class="header-row" style="margin-bottom: 10px;">
+            <h3>${icon('music')}Cue ${cue.num}: ${cue.name}</h3>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-sm" style="background: var(--accent);" onclick="openBandLabModal('${show.id}', '${listId}', '${cue.id}')">🎛 Import BandLab Stems</button>
+                <button class="btn-sm btn-outline" onclick="editSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.num}', '${cue.name.replace(/'/g, "\\'")}')">${icon('pencil')}Edit Cue</button>
+                <button class="btn-sm btn-danger" onclick="deleteSongCue('${show.id}', '${listId}', '${cue.id}', '${cue.name.replace(/'/g, "\\'")}')">${icon('trash')}Delete Cue</button>
+            </div>
+        </div>
+          
+          <div class="panel">
+            <h4>Instrumental Track</h4>
+            <div class="flex-row">
+              <input type="file" accept="audio/*" onchange="uploadInstrumental(this, '${show.id}', '${listId}', '${cue.id}')">
+              <span style="color:var(--go);">${cue.instrumentalUrl ? `<span class="status-ok">${icon('check')}Track Ready</span>` : `<span class="status-bad">${icon('x')}No Audio</span>`}</span>
+            </div>
+          </div>
+
+          ${show.casts.map(cast => {
+                const castStemsRaw = cue.castStems ? cue.castStems[cast.id] : [];
+                const stems = Array.isArray(castStemsRaw) ? castStemsRaw : (castStemsRaw ? Object.values(castStemsRaw) : []);
+                return `
+              <div class="panel">
+                <h4>${icon('mic')}Vocal Stems for: ${cast.name}</h4>
+                ${stems.map((stem, idx) => {
+                    const charDef = show.characters.find(c => c.id === stem.characterId);
+                    const member = cast.members ? cast.members[stem.characterId] : null;
+                    return `
+                    <div class="flex-row" style="background:#27272a; padding:8px; border-radius:4px; justify-content:space-between;">
+                      <div class="flex-row" style="margin:0;">
+                        <img src="${member?.avatarUrl || DEFAULT_AVATAR}" onerror="this.src='${DEFAULT_AVATAR}'" class="avatar-preview" style="width:30px; height:30px; min-width:30px; min-height:30px;">
+                        <strong>${charDef?.name || 'Role'}</strong>
+                        <span style="color:#a1a1aa;">(${member?.actor || 'No Actor Set'})</span>
+                      </div>
+                      <div>
+                        <span class="status-ok" style="font-size:12px; margin-right:10px;">${icon('check')}Audio File Attached</span>
+                        <button class="btn-sm" style="background:var(--stop);" onclick="deleteStem('${show.id}', '${listId}', '${cue.id}', '${cast.id}', ${idx})">Remove</button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+                
+                <div class="flex-row" style="margin-top:10px;">
+                  <select id="charSelect-${cue.id}-${cast.id}" style="width:200px;">
+                    <option value="">Select Character Role...</option>
+                    ${charOptions}
+                  </select>
+                  <input type="file" id="audio-${cue.id}-${cast.id}" accept="audio/*">
+                  <button class="btn-sm" onclick="addStem('${show.id}', '${listId}', '${cue.id}', '${cast.id}')">Add Stem Track</button>
+                </div>
+              </div>
+            `;
+            }).join('')}
+        </div>
+      `).join('');
+        }
+
+        async function onLiveShowChange() {
+            activeShowId = document.getElementById('live-show-select').value;
+            socket.emit('join-show', { showId: activeShowId });
+            refreshDropdowns(); renderLiveTable(); drawWaveformScrubber();
+        }
+
+        async function onLiveCastChange() {
+            const activeCastId = document.getElementById('live-cast-select').value;
+            const show = getSelectedShowById(activeShowId);
+            if (show) {
+                show.activeCastId = activeCastId;
+            }
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
+
+            const res = await fetch(`/api/shows/${activeShowId}/active`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activeCastId })
+            });
+            if (!res.ok) return;
+            const updatedShow = await res.json();
+            const showIndex = db.shows.findIndex(s => s.id === activeShowId);
+            if (showIndex !== -1) db.shows[showIndex] = updatedShow;
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
+        }
+
+        async function onLiveCueListChange() {
+            const activeCueListId = document.getElementById('live-cuelist-select').value;
+            const res = await fetch(`/api/shows/${activeShowId}/active`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activeCueListId })
+            });
+            if (!res.ok) return;
+            const updatedShow = await res.json();
+            const showIndex = db.shows.findIndex(s => s.id === activeShowId);
+            if (showIndex !== -1) db.shows[showIndex] = updatedShow;
+            refreshDropdowns();
+            renderLiveTable();
+            drawWaveformScrubber();
+        }
+
+        function triggerGo() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return alert("No show selected!");
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            if (!cueList || !sortedCues.length) return alert("No cues available!");
+
+            let cueIndex = liveState.standbyCueIndex || 0;
+            if (cueIndex >= sortedCues.length) cueIndex = 0;
+
+            liveState.activeCueIndex = cueIndex;
+            liveState.isPlaying = true;
+            playbackCurrentTime = 0;
+            playbackStartTime = Date.now();
+            selectedSeekTime = 0;
+
+            activeCueDuration = playbackDuration;
+
+            startPlayheadTimer();
+
+            const rawCue = sortedCues[cueIndex];
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            liveState.activeCastId = activeCastId;
+            const tracks = extractTracksFromCue(rawCue, activeCastId, show.characters || []);
+            const cuePayload = { ...rawCue, tracks };
+
+            socket.emit('trigger-cue', { showId: activeShowId, cue: cuePayload, index: cueIndex });
+            renderLiveTable();
+            drawWaveformScrubber();
+        }
+
+        function triggerStop() {
+            liveState.isPlaying = false;
+            playbackCurrentTime = 0;
+            stopPlayheadTimer();
+            drawWaveformScrubber();
+            socket.emit('stop-show', { showId: activeShowId });
+            renderLiveTable();
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(1);
+            return `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`;
+        }
+
+        function syncPlayheadFromTimestamp() {
+            if (liveState.isPlaying && playbackStartTime > 0) {
+                const elapsed = (Date.now() - playbackStartTime) / 1000;
+                playbackCurrentTime = Math.min(playbackDuration, Math.max(0, elapsed));
+            }
+        }
+
+        function startPlayheadTimer() {
+            stopPlayheadTimer();
+            playheadInterval = setInterval(() => {
+                if (liveState.isPlaying) {
+                    syncPlayheadFromTimestamp();
+                    drawWaveformScrubber();
+
+                    if (activeCueDuration > 0 && playbackCurrentTime >= activeCueDuration) {
+                        triggerStop();
+                    }
+                }
+            }, 100);
+        }
+
+        function stopPlayheadTimer() {
+            if (playheadInterval) clearInterval(playheadInterval);
+        }
+
+        function updateSelectedCueDuration() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return;
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            const cue = sortedCues[liveState.standbyCueIndex];
+
+            if (!cue) return;
+
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const tracks = extractTracksFromCue(cue, activeCastId, show.characters || []);
+            let audioUrl = tracks.length > 0 ? tracks[0].audioUrl : null;
+
+            if (audioUrl) {
+                const cachedDuration = durationCache.get(audioUrl);
+                if (cachedDuration !== undefined) {
+                    playbackDuration = cachedDuration;
+                    if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                        activeCueDuration = cachedDuration;
+                    }
+                    drawWaveformScrubber();
                     return;
                 }
 
-                const loadDuration = (performance.now() - loadStartTime) / 1000;
-                const adjustedSeekTime = targetSeekTime + loadDuration;
+                if (currentMetadataAudio) {
+                    currentMetadataAudio.pause();
+                    currentMetadataAudio = null;
+                }
+                const tempAudio = new Audio(audioUrl);
+                currentMetadataAudio = tempAudio;
+                tempAudio.addEventListener('loadedmetadata', () => {
+                    if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+                        durationCache.set(audioUrl, tempAudio.duration);
+                        playbackDuration = tempAudio.duration;
 
-                const scheduledStartTime = this.audioCtx.currentTime + 0.150;
-                this.startTime = scheduledStartTime - adjustedSeekTime;
-
-                tracks.forEach((track) => {
-                    const rawSrc = typeof track === 'string' ? track : (track.src || track.audioUrl || track.url);
-                    const fullUrl = getFullUrl(rawSrc);
-                    const buffer = this.stemBuffers.get(fullUrl);
-                    if (!buffer) return;
-
-                    if (adjustedSeekTime >= buffer.duration) return;
-
-                    try {
-                        const source = this.audioCtx.createBufferSource();
-                        source.buffer = buffer;
-                        source.playbackRate.setValueAtTime(1.0, this.audioCtx.currentTime);
-
-                        const gainNode = this.audioCtx.createGain();
-                        const trackAnalyser = this.audioCtx.createAnalyser();
-                        trackAnalyser.fftSize = 64;
-
-                        const volFloat = volumeMemory[track.id] !== undefined ? volumeMemory[track.id] : 1.0;
-                        const isBoosted = !!boostMemory[track.id];
-                        const initialGain = volFloat * (isBoosted ? 2.0 : 1.0);
-
-                        gainNode.gain.setValueAtTime(initialGain, this.audioCtx.currentTime);
-
-                        source.connect(gainNode);
-                        gainNode.connect(trackAnalyser);
-                        trackAnalyser.connect(this.masterAnalyser);
-
-                        source.start(scheduledStartTime, adjustedSeekTime);
-
-                        this.activeInstances.push({
-                            id: track.id,
-                            src: rawSrc,
-                            source: source,
-                            gainNode: gainNode,
-                            analyser: trackAnalyser,
-                            levelEl: document.getElementById(`level-${track.id}`)
-                        });
-                    } catch (err) {
-                        console.warn(`Error creating buffer source for track ${track.id}:`, err);
+                        if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                            activeCueDuration = tempAudio.duration;
+                        }
+                        drawWaveformScrubber();
                     }
                 });
-
-                if (this.iosAudioEl && this.iosAudioEl.paused) {
-                    this.iosAudioEl.play().catch(() => {});
-                }
-            }
-
-            updateVolume(trackId, volFloat, isBoosted) {
-                const instance = this.activeInstances.find(i => i.id === trackId);
-                if (instance && this.audioCtx) {
-                    const targetGain = volFloat * (isBoosted ? 2.0 : 1.0);
-                    instance.gainNode.gain.setTargetAtTime(targetGain, this.audioCtx.currentTime, 0.01);
-                }
-            }
-
-            seek(targetTime, currentTracks) {
-                if (currentTracks && currentTracks.length > 0) {
-                    this.playTracks(currentTracks, targetTime);
-                }
-            }
-
-            stopAll() {
-                this.isPlaying = false;
-                this.playSessionId++;
-                this.activeInstances.forEach(instance => {
-                    try {
-                        if (instance.source) {
-                            instance.source.stop(0);
-                            instance.source.disconnect();
-                        }
-                    } catch (e) { }
-                    try { if (instance.gainNode) instance.gainNode.disconnect(); } catch (e) { }
-                    try { if (instance.analyser) instance.analyser.disconnect(); } catch (e) { }
-                });
-                this.activeInstances = [];
-            }
-
-            fadeInMaster(duration = 2.0) {
-                if (!this.audioCtx || !this.masterGain) return;
-                const now = this.audioCtx.currentTime;
-                try {
-                    this.masterGain.gain.cancelScheduledValues(now);
-                    this.masterGain.gain.setValueAtTime(0.0, now);
-                    this.masterGain.gain.linearRampToValueAtTime(1.0, now + duration);
-                } catch (e) {
-                    this.masterGain.gain.setValueAtTime(1.0, now + duration);
-                }
-            }
-        }
-
-        const stemEngine = new BulletproofStemEngine();
-
-        // --- CLOCK SYNC ---
-        function syncClock() {
-            const clientSendTime = Date.now();
-            socket.emit('clock-sync', { clientSendTime });
-        }
-
-        socket.on('clock-sync-response', (data) => {
-            if (!data || !data.clientSendTime || !data.serverTime) return;
-            const now = Date.now();
-            const rtt = now - data.clientSendTime;
-            const estimatedServerTimeNow = data.serverTime + (rtt / 2);
-            serverClockOffset = estimatedServerTimeNow - now;
-        });
-
-        socket.on('connect', () => { syncClock(); });
-        setInterval(syncClock, 10000);
-
-        function getCalibratedServerTime() {
-            return Date.now() + serverClockOffset;
-        }
-
-        function initNeurons() {
-            neurons = []; pulses = [];
-            const numNeurons = Math.floor((canvas.width * canvas.height) / 18000);
-            for (let i = 0; i < numNeurons; i++) {
-                neurons.push({
-                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 0.08, vy: (Math.random() - 0.5) * 0.08,
-                    baseRadius: Math.random() * 2 + 1.5, charge: 0, cooldown: 0,
-                    colorShift: Math.random() > 0.5 ? '#1d4ed8' : '#6b21a8'
-                });
-            }
-        }
-
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            initNeurons();
-        }
-
-        async function unlockAudio() {
-            await stemEngine.ensureContextRunning();
-
-            if (stemEngine.audioCtx && stemEngine.masterGain) {
-                try {
-                    const now = stemEngine.audioCtx.currentTime;
-                    stemEngine.masterGain.gain.cancelScheduledValues(now);
-                    stemEngine.masterGain.gain.setValueAtTime(0.0, now);
-                } catch (e) { }
-                stemEngine.fadeInMaster(2.0);
-            }
-
-            audioUnlocked = true;
-            document.getElementById('unlock-overlay').style.display = 'none';
-
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            drawAbstractVisualizer();
-
-            if (pendingCueState) {
-                const state = pendingCueState; pendingCueState = null;
-                if (state && state.activeCue && state.activeCue.tracks && state.activeCue.tracks.length > 0) {
-                    calculateAndPlayCue(state);
-                }
             } else {
-                socket.emit('join-show', { showId: showId });
-                socket.emit('request-current-state', { showId: showId });
+                playbackDuration = 180;
+                if (liveState.activeCueIndex === liveState.standbyCueIndex) {
+                    activeCueDuration = 180;
+                }
             }
         }
 
-        // Auto-recover context and re-sync when switching back from Roblox / other apps
-        let isRecoveringVisibility = false;
-        document.addEventListener('visibilitychange', async () => {
-            if (!document.hidden && audioUnlocked) {
-                if (isRecoveringVisibility) return;
-                isRecoveringVisibility = true;
+        function getSelectedCueTracks() {
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return [];
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+            const cue = sortedCues[liveState.standbyCueIndex];
+            if (!cue) return [];
 
-                try {
-                    await stemEngine.ensureContextRunning();
-                    socket.emit('request-current-state', { showId: showId });
-                } catch (err) {
-                    console.error("Visibility recovery error:", err);
-                } finally {
-                    setTimeout(() => { isRecoveringVisibility = false; }, 300);
-                }
-            }
-        });
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const extracted = extractTracksFromCue(cue, activeCastId, show.characters || []);
+            const colors = ['#3b82f6', '#16a34a', '#eab308', '#ec4899', '#8b5cf6', '#06b6d4'];
 
-        socket.emit('join-show', { showId: showId });
+            return extracted.map((t, idx) => ({
+                name: t.name,
+                color: t.id === 'instrumental' ? '#3b82f6' : colors[idx % colors.length],
+                url: t.audioUrl || t.src
+            }));
+        }
 
-        socket.off('database-updated');
-        socket.on('database-updated', (db) => {
-            updateShowTitleAndPreload(db);
-        });
+        async function loadAudioPeaks(url, samples = 200) {
+            if (!url) return null;
+            if (waveformCache.has(url)) return waveformCache.get(url);
 
-        async function fetchShowInfo() {
+            const fullUrl = (url.startsWith('http://') || url.startsWith('https://')) ? url : `https://${url}`;
+
+            waveformCache.set(url, 'loading');
+
             try {
-                const res = await fetch('/api/database');
-                const db = await res.json();
-                updateShowTitleAndPreload(db);
+                const response = await fetch(fullUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Failed to fetch audio file.`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+                const rawData = audioBuffer.getChannelData(0);
+                const blockSize = Math.floor(rawData.length / samples);
+                const peaks = new Float32Array(samples);
+
+                for (let i = 0; i < samples; i++) {
+                    let start = i * blockSize;
+                    let sum = 0;
+                    for (let j = 0; j < blockSize; j++) {
+                        sum += Math.abs(rawData[start + j]);
+                    }
+                    peaks[i] = sum / blockSize;
+                }
+
+                let max = 0;
+                for (let i = 0; i < samples; i++) {
+                    if (peaks[i] > max) max = peaks[i];
+                }
+                if (max > 0) {
+                    for (let i = 0; i < samples; i++) peaks[i] = peaks[i] / max;
+                }
+
+                const data = { peaks, duration: audioBuffer.duration };
+                waveformCache.set(url, data);
+                drawWaveformScrubber();
+                return data;
             } catch (err) {
-                console.error("Failed to load show info:", err);
+                console.error("Error decoding audio waveform:", fullUrl, err);
+                waveformCache.set(url, null);
+                return null;
             }
         }
 
-        function updateShowTitleAndPreload(db) {
-            if (!db || !db.shows) return;
-            const currentShow = db.shows.find(s => s.id === showId);
-            const titleEl = document.getElementById('show-title');
-            if (titleEl && currentShow) {
-                titleEl.innerText = currentShow.title;
+        function drawWaveformScrubber() {
+            const canvas = document.getElementById('waveform-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+
+            canvas.width = rect.width * window.devicePixelRatio || 800;
+            canvas.height = rect.height * window.devicePixelRatio || 160;
+
+            const width = canvas.width;
+            const height = canvas.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = '#1e1e24';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < width; x += width / 12) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
             }
 
-            if (currentShow && currentShow.cueLists) {
-                const allUrls = [];
-                currentShow.cueLists.forEach(list => {
-                    (list.cues || []).forEach(cue => {
-                        if (cue.instrumentalUrl) allUrls.push(cue.instrumentalUrl);
-                        if (cue.castStems) {
-                            Object.values(cue.castStems).forEach(stemArr => {
-                                stemArr.forEach(stem => {
-                                    if (stem.audioUrl) allUrls.push(stem.audioUrl);
-                                });
-                            });
-                        }
+            const tracks = getSelectedCueTracks();
+
+            if (tracks.length === 0) {
+                ctx.fillStyle = '#71717a';
+                ctx.font = `${12 * window.devicePixelRatio}px system-ui`;
+                ctx.fillText("No audio files assigned to this cue.", 15 * window.devicePixelRatio, height / 2);
+                return;
+            }
+
+            const trackHeight = height / tracks.length;
+
+            tracks.forEach((track, tIdx) => {
+                const yCenter = (tIdx * trackHeight) + (trackHeight / 2);
+                const numBars = 200;
+
+                const cachedData = waveformCache.get(track.url);
+
+                if (!cachedData && track.url) {
+                    loadAudioPeaks(track.url, numBars);
+                }
+
+                ctx.fillStyle = track.color;
+                ctx.globalAlpha = 0.65;
+
+                if (cachedData === 'loading') {
+                    ctx.fillStyle = '#52525b';
+                    ctx.font = `${10 * window.devicePixelRatio}px system-ui`;
+                    ctx.fillText(`Decoding waveform for ${track.name}...`, 80 * window.devicePixelRatio, yCenter + 4);
+                } else if (cachedData && cachedData.peaks) {
+                    const peaks = cachedData.peaks;
+                    const trackDuration = cachedData.duration || playbackDuration;
+
+                    const trackWidth = Math.min(width, (trackDuration / playbackDuration) * width);
+                    const barWidth = trackWidth / numBars;
+
+                    for (let i = 0; i < numBars; i++) {
+                        const amp = peaks[i] || 0.05;
+                        const barH = Math.max(2, amp * (trackHeight * 0.8));
+                        const x = i * barWidth;
+
+                        ctx.fillRect(x, yCenter - (barH / 2), Math.max(1, barWidth - 1), barH);
+                    }
+                } else {
+                    ctx.fillRect(0, yCenter - 1, width, 2);
+                }
+
+                ctx.globalAlpha = 0.9;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${10 * window.devicePixelRatio}px system-ui`;
+                ctx.fillText(track.name.toUpperCase(), 8 * window.devicePixelRatio, (tIdx * trackHeight) + (14 * window.devicePixelRatio));
+            });
+
+            ctx.globalAlpha = 1.0;
+
+            if (selectedSeekTime > 0) {
+                const targetX = (selectedSeekTime / playbackDuration) * width;
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 2 * window.devicePixelRatio;
+                ctx.setLineDash([4 * window.devicePixelRatio, 4 * window.devicePixelRatio]);
+                ctx.beginPath(); ctx.moveTo(targetX, 0); ctx.lineTo(targetX, height); ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#eab308';
+                ctx.fillRect(targetX - (25 * window.devicePixelRatio), 2, 50 * window.devicePixelRatio, 14 * window.devicePixelRatio);
+                ctx.fillStyle = '#000000';
+                ctx.font = `bold ${9 * window.devicePixelRatio}px system-ui`;
+                ctx.textAlign = 'center';
+                ctx.fillText('TARGET', targetX, 12 * window.devicePixelRatio);
+                ctx.textAlign = 'left';
+            }
+
+            const isSelectedSongPlaying = liveState.isPlaying && (liveState.activeCueIndex === liveState.standbyCueIndex);
+
+            if (isSelectedSongPlaying) {
+                const playheadX = (playbackCurrentTime / playbackDuration) * width;
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3 * window.devicePixelRatio;
+                ctx.beginPath(); ctx.moveTo(playheadX, 0); ctx.lineTo(playheadX, height); ctx.stroke();
+
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(playheadX, 6 * window.devicePixelRatio, 6 * window.devicePixelRatio, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            document.getElementById('current-time-display').innerText = isSelectedSongPlaying ? formatTime(playbackCurrentTime) : '00:00.0';
+            document.getElementById('total-time-display').innerText = formatTime(playbackDuration);
+            document.getElementById('selected-time-display').innerText = formatTime(selectedSeekTime);
+        }
+
+        function handleWaveformClick(e) {
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            const canvas = document.getElementById('waveform-canvas');
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+            selectedSeekTime = ratio * playbackDuration;
+            drawWaveformScrubber();
+        }
+
+        function skipToSelectedPosition() {
+            if (selectedSeekTime <= 0) return alert("Click a position on the waveform scrubber first!");
+
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return;
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            const isDifferentTrack = liveState.standbyCueIndex !== liveState.activeCueIndex;
+            const isDifferentCast = liveState.activeCastId !== activeCastId;
+
+            if (isDifferentTrack || !liveState.isPlaying || isDifferentCast) {
+                liveState.activeCueIndex = liveState.standbyCueIndex;
+                liveState.activeCastId = activeCastId;
+                liveState.isPlaying = true;
+                activeCueDuration = playbackDuration;
+
+                const targetCue = sortedCues[liveState.activeCueIndex];
+                if (targetCue) {
+                    const tracks = extractTracksFromCue(targetCue, activeCastId, show.characters || []);
+                    const cuePayload = { ...targetCue, tracks };
+
+                    socket.emit('trigger-cue', {
+                        showId: activeShowId,
+                        cue: cuePayload,
+                        index: liveState.activeCueIndex
                     });
-                });
-                stemEngine.preloadAllStems(allUrls);
-            }
-        }
-
-        fetchShowInfo();
-
-        socket.off('cue-triggered');
-        socket.on('cue-triggered', (state) => {
-            if (!audioUnlocked) { pendingCueState = state; return; }
-            pendingCueState = null;
-            if (!state || !state.activeCue || !state.activeCue.tracks || state.activeCue.tracks.length === 0) {
-                handleShowStopped();
-            } else {
-                calculateAndPlayCue(state);
-            }
-        });
-
-        function calculateAndPlayCue(state) {
-            let livePosition = state.currentSeekTime || 0;
-
-            if (state.serverTimestamp) {
-                const currentCalibratedServerTime = getCalibratedServerTime();
-                const transitTimeSec = Math.max(0, (currentCalibratedServerTime - state.serverTimestamp) / 1000);
-                livePosition += transitTimeSec;
-            }
-
-            playCue(state.activeCue, livePosition);
-        }
-
-        socket.off('cue-seeked');
-        socket.on('cue-seeked', (data) => {
-            if (data && typeof data.position === 'number') {
-                stemEngine.seek(data.position, currentTracksCache);
-            }
-        });
-
-        socket.off('audience-count');
-        socket.on('audience-count', (data) => {
-            if (data.showId === showId) {
-                const audienceFooter = document.getElementById('viewer-audience-footer');
-                if (audienceFooter) {
-                    audienceFooter.innerText = `${data.count} audience member${data.count === 1 ? '' : 's'}`;
                 }
             }
-        });
 
-        socket.off('cue-stopped');
-        socket.on('cue-stopped', handleShowStopped);
+            playbackCurrentTime = selectedSeekTime;
+            playbackStartTime = Date.now() - (selectedSeekTime * 1000);
 
-        socket.off('show-stopped');
-        socket.on('show-stopped', handleShowStopped);
+            startPlayheadTimer();
+            renderLiveTable();
+            drawWaveformScrubber();
 
-        function handleShowStopped() {
-            stemEngine.stopAll();
-            hideLoadingUI();
-            currentTracksCache = [];
-            document.getElementById('show-status').innerText = "Show Stopped";
-            document.getElementById('show-status').style.color = "#94a3b8";
-            document.getElementById('cue-title').innerText = "Standby";
-
-            const stageContainer = document.getElementById('stage-container');
-            const bottomConsole = document.getElementById('bottom-console');
-            if (stageContainer) stageContainer.innerHTML = '';
-            if (bottomConsole) bottomConsole.innerHTML = '<div class="empty-state">No active tracks</div>';
-        }
-
-        function playCue(activeCue, currentSeekTime) {
-            document.getElementById('show-status').innerText = "⏳ Loading Audio...";
-            document.getElementById('show-status').style.color = "#fde047";
-            document.getElementById('cue-title').innerText = activeCue.name;
-
-            stemEngine.updateMediaSessionMetadata(activeCue.name, document.getElementById('show-title')?.innerText);
-
-            const stageContainer = document.getElementById('stage-container');
-            const bottomConsole = document.getElementById('bottom-console');
-            stageContainer.innerHTML = ''; bottomConsole.innerHTML = '';
-
-            currentTracksCache = activeCue.tracks || [];
-
-            if (currentTracksCache.length > 0) {
-                showLoadingUI(currentTracksCache.length);
-            }
-
-            currentTracksCache.forEach((track) => {
-                if (volumeMemory[track.id] === undefined) volumeMemory[track.id] = 1.0;
-                if (boostMemory[track.id] === undefined) boostMemory[track.id] = false;
-
-                const currentVolume = volumeMemory[track.id];
-                const isBoosted = boostMemory[track.id];
-
-                const avatarWrapper = document.createElement('div');
-                avatarWrapper.className = 'orbit-avatar-wrapper';
-                avatarWrapper.id = `orbit-wrapper-${track.id}`;
-                avatarWrapper.innerHTML = `
-                  <div class="pulse-ring" id="ring-${track.id}"></div>
-                  <div class="avatar-fallback" id="fallback-${track.id}">🎤</div>
-                  ${track.avatar ? `<img src="${track.avatar}" class="avatar-circle" id="avatar-${track.id}" onerror="this.style.display='none';">` : ''}
-                  <div class="avatar-label">${track.name}</div>
-                `;
-                stageContainer.appendChild(avatarWrapper);
-
-                const faderStrip = document.createElement('div');
-                faderStrip.className = `fader-strip ${isBoosted ? 'boosted' : ''}`;
-                faderStrip.id = `strip-${track.id}`;
-                faderStrip.innerHTML = `
-                  <div class="fader-strip-header">
-                    <span class="fader-strip-name" title="${track.name}">${track.name}</span>
-                    <button class="btn-boost ${isBoosted ? 'active' : ''}" id="btn-boost-${track.id}" 
-                            onclick="toggleBoost('${track.id}')" title="Boost Volume +6dB">⚡ Boost</button>
-                  </div>
-                  <div class="vu-meter">
-                    <div class="vu-fill" id="level-${track.id}"></div>
-                  </div>
-                  <div class="slider-notch-wrapper">
-                    <input type="range" class="horizontal-fader" min="0" max="1" step="0.0625" value="${currentVolume}" 
-                           oninput="handleVolumeChange('${track.id}', this.value)">
-                  </div>
-                `;
-                bottomConsole.appendChild(faderStrip);
-            });
-
-            stemEngine.playTracks(currentTracksCache, currentSeekTime || 0, (loaded, total) => {
-                updateLoadingProgress(loaded, total);
-                if (loaded >= total) {
-                    hideLoadingUI();
-                    document.getElementById('show-status').innerText = "▶ Live Now";
-                    document.getElementById('show-status').style.color = "#60a5fa";
-                }
+            socket.emit('seek-cue', {
+                showId: activeShowId,
+                position: selectedSeekTime
             });
         }
 
-        window.handleVolumeChange = function (trackId, newVolume) {
-            const volFloat = parseFloat(newVolume);
-            volumeMemory[trackId] = volFloat;
-            const isBoosted = !!boostMemory[trackId];
-            stemEngine.updateVolume(trackId, volFloat, isBoosted);
+        function renderLiveTable() {
+            const tbody = document.getElementById('live-cue-table');
+            const show = getSelectedShowById(activeShowId);
+            if (!show) return tbody.innerHTML = '';
+            const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
+            const sortedCues = getSortedCues(cueList?.cues);
+
+            tbody.innerHTML = sortedCues.map((cue, idx) => {
+                let cls = '', status = 'Ready';
+                if (idx === liveState.activeCueIndex && liveState.isPlaying) { cls = 'active-row'; status = '▶ PLAYING'; }
+                else if (idx === liveState.standbyCueIndex) { cls = 'standby-row'; status = 'STANDBY'; }
+                return `<tr class="${cls}" onclick="liveState.standbyCueIndex = ${idx}; selectedSeekTime = 0; updateSelectedCueDuration(); renderLiveTable(); drawWaveformScrubber();">
+          <td>${cue.num}</td><td>${cue.name}</td><td><strong>${status}</strong></td>
+        </tr>`;
+            }).join('');
         }
 
-        window.toggleBoost = function (trackId) {
-            boostMemory[trackId] = !boostMemory[trackId];
-            const isBoosted = boostMemory[trackId];
+        function getSelectedShow(id) { return db.shows.find(s => s.id === (document.getElementById(id) || {}).value); }
+        function getSelectedShowById(id) { return db.shows.find(s => s.id === id); }
 
-            const btn = document.getElementById(`btn-boost-${trackId}`);
-            const strip = document.getElementById(`strip-${trackId}`);
-
-            if (btn) btn.classList.toggle('active', isBoosted);
-            if (strip) strip.classList.toggle('boosted', isBoosted);
-
-            const currentVol = volumeMemory[trackId] !== undefined ? volumeMemory[trackId] : 1.0;
-            stemEngine.updateVolume(trackId, currentVol, isBoosted);
+        function updateBuilderCueListDropdown() {
+            const builderShow = getSelectedShow('builder-show-select');
+            if (builderShow) {
+                document.getElementById('builder-cuelist-select').innerHTML = builderShow.cueLists.map(cl => `<option value="${cl.id}">${cl.name}</option>`).join('');
+            }
         }
 
-        function drawAbstractVisualizer() {
-            requestAnimationFrame(drawAbstractVisualizer);
-            if (!stemEngine.masterAnalyser) return;
+        function refreshDropdowns() {
+            const opts = db.shows.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
+            ['live-show-select', 'edit-show-select', 'builder-show-select'].forEach(id => {
+                if (document.getElementById(id)) document.getElementById(id).innerHTML = opts;
+            });
 
-            const freqData = new Uint8Array(stemEngine.masterAnalyser.frequencyBinCount);
-            stemEngine.masterAnalyser.getByteFrequencyData(freqData);
+            const show = getSelectedShowById(activeShowId);
+            if (show) {
+                document.getElementById('live-cast-select').innerHTML = show.casts.map(c => `<option value="${c.id}" ${c.id === show.activeCastId ? 'selected' : ''}>${c.name}</option>`).join('');
+                document.getElementById('live-cuelist-select').innerHTML = show.cueLists.map(cl => `<option value="${cl.id}" ${cl.id === show.activeCueListId ? 'selected' : ''}>${cl.name}</option>`).join('');
+                document.getElementById('live-show-select').value = activeShowId;
+            }
+            updateBuilderCueListDropdown();
+        }
 
-            canvasCtx.fillStyle = 'rgba(7, 7, 13, 0.22)';
-            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        function renderAll() {
+            const activeId = getActiveTabId();
+            ['tab-live', 'tab-shows', 'tab-cues'].forEach(tabId => {
+                if (tabId === activeId) renderTab(tabId);
+                else dirtyTabs[tabId] = true;
+            });
+        }
 
-            let bassSum = 0, midSum = 0, highSum = 0;
-            for (let i = 0; i < 8; i++) bassSum += freqData[i];
-            for (let i = 8; i < 40; i++) midSum += freqData[i];
-            for (let i = 40; i < 128; i++) highSum += freqData[i];
+        let currentBandLabContext = null;
+        let importedFilesData = [];
+        let existingInstrumentalDuration = 0;
 
-            const bassEnergy = (bassSum / 8) / 255;
-            const midEnergy = (midSum / 32) / 255;
-            const highEnergy = (highSum / 88) / 255;
+        function closeBandLabModal() {
+            const modal = document.getElementById('bandlab-modal');
+            if (modal) modal.classList.add('hidden');
+            currentBandLabContext = null;
+            importedFilesData = [];
+            existingInstrumentalDuration = 0;
+        }
 
-            const maxConnectDist = 120 + bassEnergy * 25;
-            const isAudioPeak = bassEnergy > 0.62 || midEnergy > 0.65;
+        async function openBandLabModal(showId, listId, cueId) {
+            const modal = document.getElementById('bandlab-modal');
+            if (!modal) {
+                return alert("Error: #bandlab-modal element missing from admin.html");
+            }
 
-            neurons.forEach((n, idx) => {
-                n.x += n.vx * (1 + bassEnergy * 0.4);
-                n.y += n.vy * (1 + bassEnergy * 0.4);
+            const show = getSelectedShowById(showId);
+            const cueList = show?.cueLists.find(l => l.id === listId);
+            const cue = cueList?.cues.find(c => c.id === cueId);
 
-                if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
-                if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+            if (!show || !cue) return;
 
-                n.charge = Math.max(0, n.charge - 0.01);
-                if (n.cooldown > 0) n.cooldown--;
+            currentBandLabContext = { showId, listId, cueId, show, cue };
+            importedFilesData = [];
+            existingInstrumentalDuration = 0;
 
-                if (isAudioPeak && n.cooldown === 0 && Math.random() < 0.006) {
-                    n.charge = 1.0; n.cooldown = 200;
-                    if (pulses.length < 6) {
-                        const targetIdx = (idx + 1) % neurons.length;
-                        pulses.push({
-                            fromX: n.x, fromY: n.y, toX: neurons[targetIdx].x, toY: neurons[targetIdx].y,
-                            progress: 0, speed: 0.004 + Math.random() * 0.004
+            // Load existing instrumental duration if present for comparison
+            if (cue.instrumentalUrl) {
+                existingInstrumentalDuration = await getAudioUrlDuration(cue.instrumentalUrl);
+            }
+
+            modal.classList.remove('hidden');
+            renderBandLabModalStep1();
+        }
+
+        function renderBandLabModalStep1() {
+            const { show } = currentBandLabContext;
+            const content = document.getElementById('bandlab-modal-content');
+
+            const castOptions = show.casts.map(c =>
+                `<option value="${c.id}" ${c.id === (show.activeCastId || show.casts[0]?.id) ? 'selected' : ''}>${c.name}</option>`
+            ).join('');
+
+            content.innerHTML = `
+        <div class="panel">
+            <h4>1. Target Cast Roster</h4>
+            <label><small>Select target Cast for imported vocal stems:</small></label>
+            <select id="bl-cast-select" style="margin-top: 5px;">${castOptions}</select>
+        </div>
+
+        <div class="panel" style="margin-top: 15px;">
+            <h4>2. Select / Drop Exported BandLab Stem Files</h4>
+            <p><small style="color:#a1a1aa;">Choose multiple exported WAV or MP3 audio files from your BandLab project folder.</small></p>
+            <input type="file" id="bl-files-input" multiple accept="audio/*" onchange="processSelectedBandLabFiles(this.files)" style="margin-top:8px;">
+        </div>
+
+        <div id="bl-mapping-container" style="margin-top: 15px;"></div>
+    `;
+        }
+
+        async function executeBandLabImport() {
+            if (!currentBandLabContext) return;
+
+            const { showId, listId, cueId } = currentBandLabContext;
+            const targetCastId = document.getElementById('bl-cast-select')?.value;
+
+            const validFilesToUpload = importedFilesData.filter(d => d.assignment !== 'ignore');
+
+            if (validFilesToUpload.length === 0) {
+                return alert("No files are assigned for import. Please assign at least one stem or instrumental track.");
+            }
+
+            const modalContent = document.getElementById('bandlab-modal-content');
+            modalContent.innerHTML = `
+        <div style="text-align: center; padding: 30px;">
+            <h4>⏳ Uploading & Processing Stems...</h4>
+            <p><small style="color: #a1a1aa;">Please wait while audio files are being uploaded...</small></p>
+        </div>
+    `;
+
+            try {
+                let uploadedInstUrl = null;
+                const uploadedStems = [];
+
+                for (const item of validFilesToUpload) {
+                    // Uploads raw file using your existing upload utility function
+                    const uploadedUrl = await uploadRawFile(item.file);
+
+                    if (item.assignment === 'instrumental') {
+                        uploadedInstUrl = uploadedUrl;
+                    } else {
+                        uploadedStems.push({
+                            characterId: item.assignment,
+                            audioUrl: uploadedUrl
                         });
                     }
                 }
 
-                const radius = n.baseRadius + (n.charge * 2.5) + (bassEnergy * 1.2);
-                canvasCtx.beginPath();
-                canvasCtx.arc(n.x, n.y, radius, 0, Math.PI * 2);
-                const glowColor = n.charge > 0.4 ? '#9333ea' : n.colorShift;
-                canvasCtx.shadowBlur = 4 + (n.charge * 12);
-                canvasCtx.shadowColor = glowColor;
-                canvasCtx.fillStyle = n.charge > 0.6 ? '#c084fc' : glowColor;
-                canvasCtx.fill();
-                canvasCtx.shadowBlur = 0;
-            });
+                // Send payload to backend
+                const response = await fetch(`/api/shows/${showId}/cuelists/${listId}/cues/${cueId}/batch-import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        castId: targetCastId,
+                        instrumentalUrl: uploadedInstUrl,
+                        stems: uploadedStems
+                    })
+                });
 
-            for (let i = 0; i < neurons.length; i++) {
-                for (let j = i + 1; j < neurons.length; j++) {
-                    const dx = neurons[i].x - neurons[j].x;
-                    const dy = neurons[i].y - neurons[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                if (!response.ok) throw new Error("Batch import API request failed.");
 
-                    if (dist < maxConnectDist) {
-                        const alpha = (1 - dist / maxConnectDist) * (0.12 + midEnergy * 0.25);
-                        canvasCtx.beginPath();
-                        canvasCtx.moveTo(neurons[i].x, neurons[i].y);
-                        canvasCtx.lineTo(neurons[j].x, neurons[j].y);
-                        const isFiring = (neurons[i].charge + neurons[j].charge) > 0.4;
-                        canvasCtx.strokeStyle = isFiring ? `rgba(147, 51, 234, ${alpha * 1.5})` : `rgba(37, 99, 235, ${alpha})`;
-                        canvasCtx.lineWidth = isFiring ? 1.4 : 0.7;
-                        canvasCtx.stroke();
-                    }
+                closeBandLabModal();
+
+                // Refresh the UI view if render functions are active
+                if (typeof renderCueBuilder === 'function') {
+                    renderCueBuilder();
+                } else if (typeof loadShowData === 'function') {
+                    loadShowData();
+                }
+
+                alert("✅ BandLab stems successfully imported!");
+
+            } catch (err) {
+                alert("Import failed: " + err.message);
+                renderBandLabModalStep1();
+            }
+        }
+
+        async function processSelectedBandLabFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+
+            const { show } = currentBandLabContext;
+            const files = Array.from(fileList);
+            importedFilesData = [];
+
+            const mappingContainer = document.getElementById('bl-mapping-container');
+            mappingContainer.innerHTML = `<p style="color:var(--standby);">⏳ Processing audio stem files...</p>`;
+
+            for (const file of files) {
+                const duration = await getAudioFileDuration(file);
+                const nameLower = file.name.toLowerCase();
+                let matchedType = 'ignore';
+
+                if (nameLower.includes('inst') || nameLower.includes('backing') || nameLower.includes('music') || nameLower.includes('mix')) {
+                    matchedType = 'instrumental';
+                } else {
+                    const matchedChar = show.characters.find(c => nameLower.includes(c.name.toLowerCase()));
+                    if (matchedChar) matchedType = matchedChar.id;
+                }
+
+                importedFilesData.push({
+                    file,
+                    filename: file.name,
+                    duration,
+                    assignment: matchedType
+                });
+            }
+
+            renderBandLabMappingsConfirmation();
+        }
+
+        function renderBandLabMappingsConfirmation() {
+            const { show, cue } = currentBandLabContext;
+            const container = document.getElementById('bl-mapping-container');
+
+            if (importedFilesData.length === 0) return;
+
+            // --- INSTRUMENTAL DURATION MISMATCH WARNING ONLY ---
+            const newInst = importedFilesData.find(d => d.assignment === 'instrumental');
+            let instWarningHtml = '';
+
+            if (cue.instrumentalUrl && newInst && existingInstrumentalDuration > 0) {
+                const diff = Math.abs(newInst.duration - existingInstrumentalDuration);
+                if (diff > 0.5) {
+                    instWarningHtml = `
+                <div class="panel" style="border-left: 4px solid var(--standby); background: #451a03; color: #fde68a; margin-bottom: 15px;">
+                    ⚠️ <strong>Instrumental Duration Mismatch Warning</strong>
+                    <p style="margin-top: 4px; font-size: 13px;">
+                        The uploaded instrumental track duration (<strong>${formatTime(newInst.duration)}</strong>) does not match the existing instrumental track duration on this cue (<strong>${formatTime(existingInstrumentalDuration)}</strong>).
+                    </p>
+                </div>
+            `;
                 }
             }
 
-            for (let p = pulses.length - 1; p >= 0; p--) {
-                const pulse = pulses[p];
-                pulse.progress += pulse.speed;
-                const currX = pulse.fromX + (pulse.toX - pulse.fromX) * pulse.progress;
-                const currY = pulse.fromY + (pulse.toY - pulse.fromY) * pulse.progress;
+            const rowsHtml = importedFilesData.map((item, idx) => `
+        <tr>
+            <td style="font-size: 13px; word-break: break-all;"><strong>${item.filename}</strong></td>
+            <td style="font-size: 13px; color: #a1a1aa;">${formatTime(item.duration)}</td>
+            <td>
+                <select id="bl-assign-${idx}" onchange="importedFilesData[${idx}].assignment = this.value; renderBandLabMappingsConfirmation();">
+                    <option value="ignore" ${item.assignment === 'ignore' ? 'selected' : ''}>❌ Do Not Import</option>
+                    <option value="instrumental" ${item.assignment === 'instrumental' ? 'selected' : ''}>🎵 Instrumental Track</option>
+                    <optgroup label="Character Vocal Stems">
+                        ${show.characters.map(c => `<option value="${c.id}" ${item.assignment === c.id ? 'selected' : ''}>👤 ${c.name}</option>`).join('')}
+                    </optgroup>
+                </select>
+            </td>
+        </tr>
+    `).join('');
 
-                canvasCtx.beginPath();
-                canvasCtx.arc(currX, currY, 2 + highEnergy * 2, 0, Math.PI * 2);
-                canvasCtx.shadowBlur = 10; canvasCtx.shadowColor = '#9333ea';
-                canvasCtx.fillStyle = '#e9d5ff'; canvasCtx.fill();
-                canvasCtx.shadowBlur = 0;
+            container.innerHTML = `
+        ${instWarningHtml}
 
-                if (pulse.progress >= 1) pulses.splice(p, 1);
-            }
+        <div class="panel">
+            <h4>Confirm Stem Assignments</h4>
+            <table style="width:100%; margin-top:10px;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">BandLab File</th>
+                        <th style="text-align:left;">Duration</th>
+                        <th style="text-align:left;">Assign To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
 
-            globalOrbitAngle += 0.0008 + (bassEnergy * 0.0008);
-            const activeAudioInstances = stemEngine.activeInstances;
-            const totalTracks = activeAudioInstances.length;
-            const orbitRadius = Math.min(150, window.innerWidth * 0.22);
+            <button class="btn-go" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 12px;" onclick="executeBandLabImport()">
+                🚀 Execute Stem Import
+            </button>
+        </div>
+    `;
+        }
 
-            activeAudioInstances.forEach((instance, index) => {
-                const angle = globalOrbitAngle + (index * (2 * Math.PI / Math.max(1, totalTracks)));
-                const x = Math.cos(angle) * orbitRadius;
-                const y = Math.sin(angle) * orbitRadius;
-
-                const orbitWrapper = document.getElementById(`orbit-wrapper-${instance.id}`);
-                if (orbitWrapper) orbitWrapper.style.transform = `translate(${x}px, ${y}px)`;
-
-                if (instance.analyser) {
-                    const trackData = new Uint8Array(instance.analyser.frequencyBinCount);
-                    instance.analyser.getByteFrequencyData(trackData);
-
-                    let sum = 0;
-                    for (let i = 0; i < trackData.length; i++) { sum += trackData[i]; }
-                    let average = sum / trackData.length;
-                    const level = Math.min(1.0, average / 90.0);
-
-                    const levelEl = document.getElementById(`level-${instance.id}`);
-                    if (levelEl) levelEl.style.width = (level * 100) + "%";
-
-                    const avatarEl = document.getElementById(`avatar-${instance.id}`) || document.getElementById(`fallback-${instance.id}`);
-                    const ringEl = document.getElementById(`ring-${instance.id}`);
-
-                    if (avatarEl) {
-                        const scale = 1 + (level * 0.08);
-                        avatarEl.style.transform = `scale(${scale})`;
-                        const glowColor = level > 0.5 ? 'rgba(124, 58, 237, ' : 'rgba(37, 99, 235, ';
-                        avatarEl.style.boxShadow = `0 0 ${level * 18}px ${glowColor}${Math.min(1, level * 1.2)})`;
-                        avatarEl.style.borderColor = level > 0.08 ? (level > 0.5 ? '#7c3aed' : '#2563eb') : 'var(--border)';
-                    }
-
-                    if (ringEl) {
-                        ringEl.style.transform = `scale(${1 + (level * 1.2)})`;
-                        ringEl.style.opacity = level > 0.05 ? Math.max(0.2, 1 - (level * 0.4)) : 0;
-                        ringEl.style.borderColor = level > 0.5 ? '#7c3aed' : '#2563eb';
-                    }
-                }
+        function getAudioFileDuration(file) {
+            return new Promise((resolve) => {
+                const audio = new Audio();
+                const url = URL.createObjectURL(file);
+                audio.src = url;
+                audio.addEventListener('loadedmetadata', () => { URL.revokeObjectURL(url); resolve(audio.duration || 0); });
+                audio.addEventListener('error', () => { URL.revokeObjectURL(url); resolve(0); });
             });
         }
+
+        function getAudioUrlDuration(url) {
+            return new Promise((resolve) => {
+                const audio = new Audio(url);
+                audio.addEventListener('loadedmetadata', () => resolve(audio.duration || 0));
+                audio.addEventListener('error', () => resolve(0));
+            });
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && liveState.isPlaying) {
+                syncPlayheadFromTimestamp();
+                drawWaveformScrubber();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('login-overlay').style.display === 'none') {
+                if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); triggerGo(); }
+                if (e.code === 'Escape') { e.preventDefault(); triggerStop(); }
+            }
+        });
+
+        window.addEventListener('resize', () => drawWaveformScrubber());
+
+        loadDatabase();
     </script>
+    <!-- BANDLAB IMPORT MODAL -->
+    <div id="bandlab-modal" class="hidden"
+        style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <div class="card"
+            style="width: 720px; max-height: 90vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); padding: 25px;">
+            <div class="header-row" style="margin-bottom: 15px;">
+                <h3>🎛 Import BandLab Project & Stems</h3>
+                <button class="btn-sm btn-outline" style="width:auto;" onclick="closeBandLabModal()">✕ Close</button>
+            </div>
+            <div id="bandlab-modal-content"></div>
+        </div>
+    </div>
 </body>
 
 </html>
