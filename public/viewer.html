@@ -23,14 +23,15 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
+            padding: 0 12px 24px;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
+            text-rendering: optimizeLegibility;
         }
 
         #visualizer-canvas {
@@ -115,16 +116,21 @@
             letter-spacing: 0.5px;
         }
 
-        /* --- CENTER ORBITING STAGE --- */
+        /* --- STAGE CONTAINER --- */
         #stage-container {
-            position: absolute;
-            top: 42%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 400px;
-            height: 400px;
+            position: relative;
+            width: min(100%, 520px);
+            height: min(70vw, 420px);
+            max-height: 420px;
+            margin: 18px auto 10px;
             z-index: 1;
             pointer-events: none;
+            border-radius: 28px;
+            overflow: hidden;
+            background: radial-gradient(circle at top center, rgba(37, 99, 235, 0.18), transparent 40%),
+                        linear-gradient(180deg, rgba(15, 16, 30, 0.98), rgba(8, 8, 18, 0.95));
+            box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         /* --- LOADING INDICATOR --- */
@@ -247,16 +253,16 @@
 
         .avatar-label {
             position: absolute;
-            bottom: -38px;
+            bottom: -36px;
             font-size: 11px;
             font-weight: 600;
             color: #f1f5f9;
             text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
             white-space: nowrap;
-            background: rgba(7, 7, 13, 0.9);
-            padding: 3px 8px;
-            border-radius: 8px;
-            border: 1px solid rgba(124, 58, 237, 0.35);
+            background: rgba(7, 7, 13, 0.92);
+            padding: 4px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             pointer-events: none;
             z-index: 3;
         }
@@ -265,25 +271,23 @@
         #bottom-console {
             position: relative;
             z-index: 10;
-            margin-bottom: 24px;
-            background: rgba(17, 17, 24, 0.88);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(124, 58, 237, 0.2);
-            border-radius: 20px;
-            padding: 20px 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 24px;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+            margin: 0 auto 24px;
+            width: min(100%, 980px);
+            background: rgba(17, 17, 24, 0.94);
+            backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 28px;
+            padding: 18px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
             max-width: 92vw;
-            overflow-y: auto;
-            flex-wrap: wrap;
         }
 
         .audience-footer {
             margin: 0 auto 24px;
-            max-width: 92vw;
+            width: min(100%, 980px);
             padding: 12px 20px;
             border-radius: 18px;
             background: rgba(255, 255, 255, 0.06);
@@ -298,12 +302,13 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            min-width: 290px;
-            background: rgba(24, 24, 36, 0.6);
-            padding: 14px 18px;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+            min-width: 0;
+            background: rgba(24, 24, 36, 0.88);
+            padding: 18px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
         }
 
         .fader-strip.boosted {
@@ -316,6 +321,7 @@
             justify-content: space-between;
             align-items: center;
             width: 100%;
+            gap: 10px;
         }
 
         .fader-strip-name {
@@ -334,10 +340,12 @@
             color: var(--muted);
             font-size: 10px;
             font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 6px;
+            padding: 6px 10px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
+            min-width: 72px;
+            text-align: center;
         }
 
         .btn-boost:hover {
@@ -548,7 +556,8 @@
             initContext() {
                 if (!this.audioCtx || this.audioCtx.state === 'closed') {
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-                        latencyHint: 'playback'
+                        latencyHint: 'playback',
+                        sampleRate: 44100
                     });
 
                     this.masterAnalyser = this.audioCtx.createAnalyser();
@@ -711,6 +720,7 @@
                     try {
                         const source = this.audioCtx.createBufferSource();
                         source.buffer = buffer;
+                        source.playbackRate.setValueAtTime(1.0, this.audioCtx.currentTime);
 
                         const gainNode = this.audioCtx.createGain();
                         const trackAnalyser = this.audioCtx.createAnalyser();
