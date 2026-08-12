@@ -939,6 +939,16 @@
             }
         });
 
+        socket.off('audience-count');
+        socket.on('audience-count', (data) => {
+            if (data.showId === showId) {
+                const audienceFooter = document.getElementById('viewer-count');
+                if (audienceFooter) {
+                    audienceFooter.innerText = `${data.count} audience member${data.count === 1 ? '' : 's'}`;
+                }
+            }
+        });
+
         socket.off('cue-stopped');
         socket.on('cue-stopped', handleShowStopped);
 
@@ -1178,6 +1188,9 @@
             });
         }
     </script>
+    <div id="viewer-count"
+            style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); position: absolute; top: 8px; right: 4px;">
+            0 audience members</div>
 </body>
 
 </html>
