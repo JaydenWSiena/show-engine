@@ -576,7 +576,7 @@
         socket.on('connect', () => socket.emit('register-admin'));
         let db = { shows: [] };
         let activeShowId = null;
-        let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false };
+        let liveState = { activeCueIndex: 0, standbyCueIndex: 0, isPlaying: false, activeCastId: null };
 
         // SAFE BASE64 DARK-MODE VECTOR AVATAR DATA-URI (NO QUOTE/STRING ESCAPING ISSUES)
         const DEFAULT_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI3MjcyYSIgc3Ryb2tlPSIjYTFhMWFhIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCIvPjwvc3ZnPg==";
@@ -1173,6 +1173,7 @@
 
             const rawCue = sortedCues[cueIndex];
             const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
+            liveState.activeCastId = activeCastId;
             const tracks = extractTracksFromCue(rawCue, activeCastId, show.characters || []);
             const cuePayload = { ...rawCue, tracks };
 
@@ -1468,16 +1469,18 @@
             const cueList = show.cueLists.find(cl => cl.id === show.activeCueListId) || show.cueLists[0];
             const sortedCues = getSortedCues(cueList?.cues);
 
+            const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
             const isDifferentTrack = liveState.standbyCueIndex !== liveState.activeCueIndex;
+            const isDifferentCast = liveState.activeCastId !== activeCastId;
 
-            if (isDifferentTrack || !liveState.isPlaying) {
+            if (isDifferentTrack || !liveState.isPlaying || isDifferentCast) {
                 liveState.activeCueIndex = liveState.standbyCueIndex;
+                liveState.activeCastId = activeCastId;
                 liveState.isPlaying = true;
                 activeCueDuration = playbackDuration;
 
                 const targetCue = sortedCues[liveState.activeCueIndex];
                 if (targetCue) {
-                    const activeCastId = show.activeCastId || (show.casts[0] || {}).id;
                     const tracks = extractTracksFromCue(targetCue, activeCastId, show.characters || []);
                     const cuePayload = { ...targetCue, tracks };
 
